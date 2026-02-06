@@ -1,7 +1,15 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Circle, Square, Video } from 'lucide-react';
 
-export function RecordingControls() {
+interface RecordingControlsProps {
+  onRecordingStart?: (stream: MediaStream) => void;
+  onRecordingStop?: () => void;
+}
+
+export function RecordingControls({
+  onRecordingStart,
+  onRecordingStop,
+}: RecordingControlsProps) {
   const [status, setStatus] = useState<'idle' | 'recording'>('idle');
   const [elapsed, setElapsed] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -51,6 +59,7 @@ export function RecordingControls() {
       recorder.start();
       setStatus('recording');
       setElapsed(0);
+      onRecordingStart?.(stream);
 
       timerRef.current = setInterval(() => {
         setElapsed((prev) => prev + 1);
@@ -58,7 +67,7 @@ export function RecordingControls() {
     } catch (err) {
       console.error('Failed to start recording:', err);
     }
-  }, []);
+  }, [onRecordingStart]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current?.state === 'recording') {
@@ -69,7 +78,8 @@ export function RecordingControls() {
       timerRef.current = null;
     }
     setStatus('idle');
-  }, []);
+    onRecordingStop?.();
+  }, [onRecordingStop]);
 
   useEffect(() => {
     return () => {

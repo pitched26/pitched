@@ -7,21 +7,33 @@ import type { PitchData } from '../data/mockPitch';
 
 interface LiveInsightsPanelProps {
   data: PitchData;
+  isAnalyzing?: boolean;
+  cycleCount?: number;
   onViewTranscript?: () => void;
   onFollowUp?: (id: string) => void;
 }
 
 export function LiveInsightsPanel({
   data,
+  isAnalyzing,
+  cycleCount,
   onViewTranscript,
   onFollowUp,
 }: LiveInsightsPanelProps) {
   return (
     <GlassPanel className="flex w-[380px] shrink-0 flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b border-overlay-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-overlay-text">
-          ✨ Live Insights
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-overlay-text">
+            ✨ Live Insights
+          </h2>
+          {isAnalyzing && (
+            <span className="flex items-center gap-1 text-xs text-overlay-accent">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-overlay-accent" />
+              {cycleCount && cycleCount > 0 ? 'Updating...' : 'Analyzing pitch...'}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={onViewTranscript}

@@ -1,10 +1,22 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { LiveInsightsPanel } from './LiveInsightsPanel';
 import { PitchAnalysisPanel } from './PitchAnalysisPanel';
 import { RecordingControls } from './RecordingControls';
 import { mockPitchData } from '../data/mockPitch';
+import { useRealtimeAnalysis } from '../hooks/useRealtimeAnalysis';
 
 export function OverlayRoot() {
+  const {
+    pitchData,
+    isAnalyzing,
+    cycleCount,
+    error,
+    startAnalysis,
+    stopAnalysis,
+  } = useRealtimeAnalysis();
+
+  const displayData = pitchData ?? mockPitchData;
+
   const handleViewTranscript = () => {
     // Placeholder: open transcript view
   };
@@ -13,6 +25,17 @@ export function OverlayRoot() {
     // Placeholder: trigger follow-up
     console.log('Follow-up:', id);
   };
+
+  const handleRecordingStart = useCallback(
+    (stream: MediaStream) => {
+      startAnalysis(stream);
+    },
+    [startAnalysis]
+  );
+
+  const handleRecordingStop = useCallback(() => {
+    stopAnalysis();
+  }, [stopAnalysis]);
 
   return (
     <div
@@ -25,16 +48,27 @@ export function OverlayRoot() {
           style={{ animationFillMode: 'forwards' }}
         >
           <LiveInsightsPanel
-            data={mockPitchData}
+            data={displayData}
+            isAnalyzing={isAnalyzing}
+            cycleCount={cycleCount}
             onViewTranscript={handleViewTranscript}
             onFollowUp={handleFollowUp}
           />
-          <PitchAnalysisPanel data={mockPitchData} />
+          <PitchAnalysisPanel data={displayData} isAnalyzing={isAnalyzing} />
         </div>
       </div>
 
+      {error && (
+        <div className="pointer-events-auto fixed bottom-20 left-1/2 -translate-x-1/2 rounded-lg border border-rose-500/30 bg-rose-500/20 px-4 py-2 text-sm text-rose-300 backdrop-blur-sm">
+          {error}
+        </div>
+      )}
+
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2">
-        <RecordingControls />
+        <RecordingControls
+          onRecordingStart={handleRecordingStart}
+          onRecordingStop={handleRecordingStop}
+        />
       </div>
     </div>
   );

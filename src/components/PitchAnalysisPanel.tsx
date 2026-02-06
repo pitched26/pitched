@@ -4,17 +4,23 @@ import type { PitchData } from '../data/mockPitch';
 
 interface PitchAnalysisPanelProps {
   data: PitchData;
+  isAnalyzing?: boolean;
 }
 
-export function PitchAnalysisPanel({ data }: PitchAnalysisPanelProps) {
+export function PitchAnalysisPanel({ data, isAnalyzing }: PitchAnalysisPanelProps) {
   const { company, traction, riskFlags, analystNotes } = data;
 
   return (
     <GlassPanel className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <header className="border-b border-overlay-border px-4 py-3">
+      <header className="flex items-center justify-between border-b border-overlay-border px-4 py-3">
         <h2 className="text-sm font-semibold text-overlay-text">
           Pitch Analysis
         </h2>
+        {isAnalyzing && (
+          <span className="flex items-center gap-1 text-xs text-overlay-accent">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-overlay-accent" />
+          </span>
+        )}
       </header>
 
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4">

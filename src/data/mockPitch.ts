@@ -1,44 +1,14 @@
-export interface PitchSummaryItem {
-  id: string;
-  text: string;
-}
+export type {
+  PitchSummaryItem,
+  Signal,
+  FollowUpPrompt,
+  CompanyOverview,
+  TractionMetrics,
+  RiskFlag,
+  PitchData,
+} from '../types/pitch';
 
-export interface Signal {
-  label: string;
-  value: 'High' | 'Medium' | 'Low' | 'Unclear';
-}
-
-export interface FollowUpPrompt {
-  id: string;
-  label: string;
-}
-
-export interface CompanyOverview {
-  name: string;
-  category: string;
-  valueProposition: string;
-}
-
-export interface TractionMetrics {
-  arr?: string;
-  customerCount?: string;
-  growthSignals: string[];
-}
-
-export interface RiskFlag {
-  id: string;
-  text: string;
-}
-
-export interface PitchData {
-  summary: PitchSummaryItem[];
-  signals: Signal[];
-  followUps: FollowUpPrompt[];
-  company: CompanyOverview;
-  traction: TractionMetrics;
-  riskFlags: RiskFlag[];
-  analystNotes: string;
-}
+import type { PitchData } from '../types/pitch';
 
 export const mockPitchData: PitchData = {
   summary: [

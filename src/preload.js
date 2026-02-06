@@ -1,2 +1,8 @@
-// See the Electron documentation for details on how to use preload scripts:
-// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('pitchly', {
+  transcribeAudio: (audioBase64) =>
+    ipcRenderer.invoke('transcribe-audio', audioBase64),
+  analyzePitch: (transcript, frameBase64) =>
+    ipcRenderer.invoke('analyze-pitch', transcript, frameBase64),
+});
