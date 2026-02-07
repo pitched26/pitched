@@ -65,9 +65,19 @@ export function OverlayRoot() {
   }, []);
 
   // Show errors as toasts (decoupled from main UI)
+  // Filter out transient/expected errors that shouldn't bother the user
   useEffect(() => {
     if (error) {
-      showToast(error, 'soft'); // API errors are soft (transient)
+      // Skip expected API conflicts (these are handled internally)
+      const isTransient =
+        error.includes('already has an active response') ||
+        error.includes('Disconnected') ||
+        error.includes('inflight') ||
+        error.includes('Conversation already');
+
+      if (!isTransient) {
+        showToast(error, 'soft');
+      }
     }
   }, [error, showToast]);
 
