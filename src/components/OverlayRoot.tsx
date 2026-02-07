@@ -5,7 +5,6 @@ import { SettingsPanel } from './SettingsPanel';
 import { Teleprompter } from './Teleprompter';
 import { RecordingControls } from './RecordingControls';
 import { PostSessionSummary } from './PostSessionSummary';
-import { SystemToast, useToasts } from './SystemToast';
 import { mockPitchData } from '../data/mockPitch';
 import { useRealtimeAnalysis } from '../hooks/useRealtimeAnalysis';
 
@@ -13,9 +12,8 @@ export function OverlayRoot() {
   const {
     pitchData,
     isAnalyzing,
-    error,
     pace,
-    transcript, // Assuming it's exposed now or I will add it
+    transcript,
     startAnalysis,
     stopAnalysis,
   } = useRealtimeAnalysis();
@@ -32,12 +30,6 @@ export function OverlayRoot() {
   // Post-Session State
   const [isPostSession, setIsPostSession] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
-
-  // Camera Error State
-  const [cameraError, setCameraError] = useState<string | null>(null);
-
-  // Toast System (decoupled error display)
-  const { toasts, showToast, dismissToast } = useToasts();
 
   const displayData = pitchData ?? mockPitchData;
 
@@ -58,34 +50,10 @@ export function OverlayRoot() {
         }
       } catch (err) {
         console.error('Failed to initialize camera:', err);
-        setCameraError(err instanceof Error ? err.message : 'Camera failed to start');
       }
     }
     initCamera();
   }, []);
-
-  // Show errors as toasts (decoupled from main UI)
-  // Filter out transient/expected errors that shouldn't bother the user
-  useEffect(() => {
-    if (error) {
-      // Skip expected API conflicts (these are handled internally)
-      const isTransient =
-        error.includes('already has an active response') ||
-        error.includes('Disconnected') ||
-        error.includes('inflight') ||
-        error.includes('Conversation already');
-
-      if (!isTransient) {
-        showToast(error, 'soft');
-      }
-    }
-  }, [error, showToast]);
-
-  useEffect(() => {
-    if (cameraError) {
-      showToast(cameraError, 'hard'); // Camera/permission errors are hard
-    }
-  }, [cameraError, showToast]);
 
   const handleRecordingStart = useCallback(
     (s: MediaStream) => {
@@ -211,9 +179,6 @@ export function OverlayRoot() {
           </button>
         </div>
       )}
-
-      {/* System Toast Layer (top-right, independent) */}
-      <SystemToast toasts={toasts} onDismiss={dismissToast} />
 
       {/* Slide-out Settings Panel */}
       <SettingsPanel
