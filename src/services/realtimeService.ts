@@ -7,9 +7,26 @@ function ts(): string {
 
 const TAG = '[Realtime]';
 
-const INSTRUCTIONS = `You are a calm, world-class pitch coach giving real-time micro-feedback via a floating UI bar. You hear the speaker's audio directly.
+const MODE_CONTEXT: Record<string, string> = {
+  science: `MODE: Science Pitch
+Focus on: data accuracy, methodology rigor, clarity of hypothesis, statistical claims, reproducibility.
+Judging criteria: prioritize scientific precision, clear methodology explanation, evidence quality, and logical structure. Be strict on unsupported claims and vague methodology.`,
+  tech: `MODE: Tech Pitch
+Focus on: innovation, technical architecture, scalability, developer experience, competitive differentiation.
+Judging criteria: prioritize technical depth, feasibility, clear value proposition, and demo readiness. Be strict on hand-waving and unsubstantiated scalability claims.`,
+  business: `MODE: Business Pitch
+Focus on: market fit, revenue model, traction metrics, competitive landscape, growth strategy, unit economics.
+Judging criteria: prioritize clear business model, realistic projections, market understanding, and compelling narrative. Be strict on missing numbers and vague go-to-market.`,
+};
+
+function buildInstructions(mode: string, customInstructions: string): string {
+  const modeSection = MODE_CONTEXT[mode] || MODE_CONTEXT.tech;
+
+  let prompt = `You are a calm, world-class pitch coach giving real-time micro-feedback via a floating UI bar. You hear the speaker's audio directly.
 
 Your feedback philosophy: a subtle nudge on the shoulder, not a lecture.
+
+${modeSection}
 
 RULES — follow these exactly:
 1. Each tip is 5-10 words. One short sentence MAX. No conjunctions.
@@ -33,6 +50,13 @@ HARD ANTI-PATTERNS (never output):
 - Over-explaining or moralizing
 - Phrases starting with "You should", "Try to", "Consider"
 - Constant negativity — bias toward encouragement unless correction is clearly needed`;
+
+  if (customInstructions.trim()) {
+    prompt += `\n\nCUSTOM INSTRUCTIONS FROM USER:\n${customInstructions.trim()}`;
+  }
+
+  return prompt;
+}
 
 const COACHING_TOOL = {
   type: 'function' as const,
@@ -100,6 +124,10 @@ export class RealtimeService {
   private currentCallId = '';
   private currentArgs = '';
 
+  // Settings
+  private mode = 'tech';
+  private customInstructions = '';
+
   constructor(apiKey: string) {
     this.apiKey = apiKey;
   }
@@ -164,7 +192,7 @@ export class RealtimeService {
       type: 'session.update',
       session: {
         modalities: ['text'],
-        instructions: INSTRUCTIONS,
+        instructions: buildInstructions(this.mode, this.customInstructions),
         input_audio_format: 'pcm16',
         input_audio_transcription: { model: 'whisper-1' },
         turn_detection: null, // manual mode — we control when to get responses
@@ -173,6 +201,16 @@ export class RealtimeService {
         temperature: 0.6,
       },
     });
+  }
+
+  /** Update mode and custom instructions, reconfigure the live session */
+  updateSettings(mode: string, customInstructions: string) {
+    this.mode = mode;
+    this.customInstructions = customInstructions;
+    console.log(`[${ts()}] ${TAG} Settings updated — mode=${mode}, instructions=${customInstructions.length} chars`);
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.configureSession();
+    }
   }
 
   /**

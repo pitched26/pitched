@@ -9,8 +9,8 @@ import type { PitchData } from '../types/pitch';
 export const mockPitchData: PitchData = {
   tips: [],
   signals: [
-    { label: 'Clarity', value: 'Medium' },
-    { label: 'Energy', value: 'High' },
+    { label: 'Clarity', value: 'Unclear' },
+    { label: 'Energy', value: 'Unclear' },
     { label: 'Pace', value: 'Unclear' },
   ],
   coachNote: '',

@@ -20,6 +20,7 @@ export interface PitchData {
 export const IPC_CHANNELS = {
   ANALYZE_AUDIO: 'analyze-audio',
   REALTIME_DISCONNECT: 'realtime-disconnect',
+  REALTIME_UPDATE_SETTINGS: 'realtime-update-settings',
   GENERATE_SUMMARY: 'generate-summary',
 } as const;
 

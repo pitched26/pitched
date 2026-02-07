@@ -230,7 +230,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
             isAnalyzing: inflightRef.current > 0,
             cycleCount: prev.cycleCount + 1,
             error: null,
-            tipHistory: [...prev.tipHistory, ...sanitizedTips],
+            tipHistory: [...prev.tipHistory, ...sanitizedTips].slice(-3),
             transcript: result.transcript || prev.transcript,
           }));
         }

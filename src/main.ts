@@ -62,6 +62,11 @@ ipcMain.handle(IPC_CHANNELS.REALTIME_DISCONNECT, () => {
   realtimeService?.disconnect();
 });
 
+// Update Realtime session settings (mode + custom instructions)
+ipcMain.handle(IPC_CHANNELS.REALTIME_UPDATE_SETTINGS, (_event, mode: string, customInstructions: string) => {
+  realtimeService?.updateSettings(mode, customInstructions);
+});
+
 // Generate Session Summary
 let dedalusService: DedalusService | null = null;
 const dedalusApiKey = process.env.DEDALUS_API_KEY || process.env.OPENAI_API_KEY; // Fallback

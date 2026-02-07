@@ -3,39 +3,60 @@ import { GlassPanel } from './GlassPanel';
 import { SpeedIndicator } from './SpeedIndicator';
 import { SignalBadge } from './SignalBadge';
 import type { PitchData } from '../data/mockPitch';
+import type { CoachingTip } from '../types/pitch';
+
+const MAX_VISIBLE_TIPS = 3;
 
 interface UnifiedTopBarProps {
     data: PitchData;
     isAnalyzing: boolean;
     pace?: number;
+    tipHistory?: CoachingTip[];
 }
 
-export function UnifiedTopBar({ data, isAnalyzing, pace = 0 }: UnifiedTopBarProps) {
-    const latestFeedback = data.tips.length > 0
-        ? data.tips[0].text
-        : isAnalyzing
-            ? "Listening for your pitch..."
-            : "Start pitching for real-time feedback...";
+export function UnifiedTopBar({ data, isAnalyzing, pace = 0, tipHistory = [] }: UnifiedTopBarProps) {
+    const visibleTips = tipHistory.slice(-MAX_VISIBLE_TIPS);
+
+    const placeholder = isAnalyzing
+        ? "Listening for your pitch..."
+        : "Start pitching for real-time feedback...";
 
     return (
-        <GlassPanel className="flex flex-col items-center w-full max-w-3xl px-8 py-5 mx-auto rounded-3xl pointer-events-auto backdrop-blur-2xl bg-white/10 border border-white/20 shadow-2xl transition-all duration-300 gap-3">
+        <GlassPanel className="flex flex-col items-center w-full max-w-3xl px-10 py-6 mx-auto rounded-3xl pointer-events-auto backdrop-blur-3xl bg-black/40 border border-white/15 shadow-2xl transition-all duration-300 gap-3">
 
             {/* TOP ROW: Speed Indicator */}
             <div className="flex justify-center w-full opacity-90 scale-90">
                 <SpeedIndicator pace={pace} isSpeaking={isAnalyzing} />
             </div>
 
-            {/* MIDDLE ROW: Primary Feedback (Dominant) */}
-            <div className="flex-1 flex items-center justify-center w-full py-1">
-                <div
-                    className="text-xl md:text-2xl font-semibold text-white text-center leading-tight transition-opacity duration-300 drop-shadow-md text-balance"
-                    style={{
-                        opacity: isAnalyzing || latestFeedback !== "Start pitching for real-time feedback..." ? 1 : 0.6,
-                        textShadow: '0 2px 12px rgba(0,0,0,0.3)'
-                    }}
-                >
-                    {latestFeedback}
-                </div>
+            {/* MIDDLE ROW: Rolling Feedback List */}
+            <div className="flex flex-col items-center gap-2 w-full py-2 min-h-[2.5rem]">
+                {visibleTips.length > 0 ? (
+                    visibleTips.map((tip, i) => {
+                        const isNewest = i === visibleTips.length - 1;
+                        return (
+                            <div
+                                key={`${tip.id}-${i}`}
+                                className="transition-all duration-300"
+                                style={{ opacity: isNewest ? 1 : 0.5 + (i / visibleTips.length) * 0.4 }}
+                            >
+                                <span
+                                    className={`text-white leading-snug text-center transition-all duration-300 ${isNewest ? 'text-2xl md:text-3xl font-bold' : 'text-lg md:text-xl font-medium'}`}
+                                    style={{ textShadow: '0 2px 16px rgba(0,0,0,0.7), 0 0 40px rgba(0,0,0,0.3)' }}
+                                >
+                                    {tip.text}
+                                </span>
+                            </div>
+                        );
+                    })
+                ) : (
+                    <div
+                        className="text-2xl md:text-3xl font-bold text-white text-center leading-tight drop-shadow-lg"
+                        style={{ opacity: isAnalyzing ? 1 : 0.6, textShadow: '0 2px 16px rgba(0,0,0,0.7), 0 0 40px rgba(0,0,0,0.3)' }}
+                    >
+                        {placeholder}
+                    </div>
+                )}
             </div>
 
             {/* BOTTOM ROW: Signals */}

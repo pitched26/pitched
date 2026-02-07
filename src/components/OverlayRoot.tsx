@@ -14,6 +14,7 @@ export function OverlayRoot() {
     isAnalyzing,
     pace,
     transcript,
+    tipHistory,
     startAnalysis,
     stopAnalysis,
   } = useRealtimeAnalysis();
@@ -55,17 +56,27 @@ export function OverlayRoot() {
     initCamera();
   }, []);
 
+  // Push settings to backend when they change during an active session
+  const isRecordingRef = useRef(false);
+  useEffect(() => {
+    if (isRecordingRef.current) {
+      window.pitchly.updateSettings(mode, instructions);
+    }
+  }, [mode, instructions]);
+
   const handleRecordingStart = useCallback(
     (s: MediaStream) => {
       setIsPostSession(false);
+      isRecordingRef.current = true;
+      window.pitchly.updateSettings(mode, instructions);
       startAnalysis(s);
     },
-    [startAnalysis]
+    [startAnalysis, mode, instructions]
   );
 
   const handleRecordingStop = useCallback(() => {
+    isRecordingRef.current = false;
     stopAnalysis();
-    // We wait for onRecordingComplete to trigger the summary screen
   }, [stopAnalysis]);
 
   const handleRecordingComplete = useCallback((blob: Blob) => {
@@ -135,6 +146,7 @@ export function OverlayRoot() {
             data={displayData}
             isAnalyzing={isAnalyzing}
             pace={pace}
+            tipHistory={tipHistory}
           />
         </div>
       )}
