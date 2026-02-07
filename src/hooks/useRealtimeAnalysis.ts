@@ -34,6 +34,70 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Feedback Guardrails — enforce brevity & prevent repetition client-side
+// ═══════════════════════════════════════════════════════════════════════
+
+const RECENT_TIPS_WINDOW = 6; // remember last N tips to prevent repeats
+const MAX_TIP_WORDS = 12;     // hard cap on tip length
+
+/** Sliding window of recent tip texts for de-duplication */
+let recentTipTexts: string[] = [];
+
+/** Normalize tip text for comparison (lowercase, strip punctuation) */
+function normalizeTip(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+}
+
+/**
+ * Post-process tips from the LLM:
+ * 1. Strip "You said" / "You should" prefixes
+ * 2. Truncate overly long tips
+ * 3. De-duplicate against recent tips
+ * 4. Track in sliding window
+ */
+function sanitizeTips(tips: CoachingTip[]): CoachingTip[] {
+  const cleaned: CoachingTip[] = [];
+
+  for (const tip of tips) {
+    let text = tip.text.trim();
+
+    // Strip anti-pattern prefixes the LLM may still produce
+    text = text.replace(/^(You said|You mentioned|Your pitch|You should|The user|Try to|Consider)\s*/i, '');
+    // Capitalize first letter after stripping
+    if (text.length > 0) text = text[0].toUpperCase() + text.slice(1);
+
+    // Truncate to MAX_TIP_WORDS
+    const words = text.split(/\s+/);
+    if (words.length > MAX_TIP_WORDS) {
+      text = words.slice(0, MAX_TIP_WORDS).join(' ');
+      // Clean trailing conjunction/preposition
+      text = text.replace(/\s+(and|but|or|the|a|to|for|in|on|with|that|is)$/i, '');
+    }
+
+    // De-duplicate against recent window
+    const norm = normalizeTip(text);
+    const isDuplicate = recentTipTexts.some(recent => {
+      const r = normalizeTip(recent);
+      return r === norm || r.includes(norm) || norm.includes(r);
+    });
+
+    if (!isDuplicate && text.length > 0) {
+      cleaned.push({ ...tip, text });
+    }
+  }
+
+  // Update sliding window
+  for (const tip of cleaned) {
+    recentTipTexts.push(tip.text);
+  }
+  if (recentTipTexts.length > RECENT_TIPS_WINDOW) {
+    recentTipTexts = recentTipTexts.slice(-RECENT_TIPS_WINDOW);
+  }
+
+  return cleaned;
+}
+
 /** Convert ArrayBuffer to base64 via FileReader (efficient, no stack limits) */
 function arrayBufferToBase64(buffer: ArrayBuffer): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -153,16 +217,21 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
 
         if (result.data) {
           lastDisplayedSeqRef.current = seq;
-          console.log(`[${ts()}] ${TAG} seq=#${seq} DISPLAY in ${roundtripMs}ms — tips=[${result.data.tips.map(t => `"${t.text}"`).join(', ')}]`);
+
+          // Apply guardrails: brevity enforcement + de-duplication
+          const sanitizedTips = sanitizeTips(result.data.tips);
+          const sanitizedData = { ...result.data, tips: sanitizedTips };
+
+          console.log(`[${ts()}] ${TAG} seq=#${seq} DISPLAY in ${roundtripMs}ms — tips=[${sanitizedTips.map(t => `"${t.text}"`).join(', ')}]`);
 
           setState((prev) => ({
             ...prev,
-            pitchData: result.data!,
+            pitchData: sanitizedData,
             isAnalyzing: inflightRef.current > 0,
             cycleCount: prev.cycleCount + 1,
             error: null,
-            tipHistory: [...prev.tipHistory, ...result.data!.tips],
-            transcript: result.transcript || prev.transcript, // Update transcript
+            tipHistory: [...prev.tipHistory, ...sanitizedTips],
+            transcript: result.transcript || prev.transcript,
           }));
         }
       })
@@ -190,6 +259,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       inflightRef.current = 0;
       prevWordCountRef.current = 0;
       paceTrackerRef.current.reset();
+      recentTipTexts = []; // Reset anti-repetition window
 
       setState({
         pitchData: null,
