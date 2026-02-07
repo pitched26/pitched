@@ -1,12 +1,14 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Circle, Square, Video } from 'lucide-react';
 
 interface RecordingControlsProps {
+  stream: MediaStream | null;
   onRecordingStart?: (stream: MediaStream) => void;
   onRecordingStop?: () => void;
 }
 
 export function RecordingControls({
+  stream,
   onRecordingStart,
   onRecordingStop,
 }: RecordingControlsProps) {
@@ -14,7 +16,6 @@ export function RecordingControls({
   const [elapsed, setElapsed] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const formatTime = (seconds: number) => {
@@ -24,12 +25,12 @@ export function RecordingControls({
   };
 
   const startRecording = useCallback(async () => {
+    if (!stream) {
+      console.error('No stream available to record');
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-      streamRef.current = stream;
       chunksRef.current = [];
 
       const recorder = new MediaRecorder(stream, {
@@ -50,9 +51,6 @@ export function RecordingControls({
         a.download = `pitch-recording-${Date.now()}.webm`;
         a.click();
         URL.revokeObjectURL(url);
-
-        stream.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
       };
 
       mediaRecorderRef.current = recorder;
@@ -67,7 +65,7 @@ export function RecordingControls({
     } catch (err) {
       console.error('Failed to start recording:', err);
     }
-  }, [onRecordingStart]);
+  }, [stream, onRecordingStart]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current?.state === 'recording') {
@@ -84,7 +82,6 @@ export function RecordingControls({
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      streamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
 
@@ -99,7 +96,8 @@ export function RecordingControls({
       {status === 'idle' ? (
         <button
           onClick={startRecording}
-          className="flex items-center gap-2 rounded-lg bg-red-500/80 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-500"
+          disabled={!stream}
+          className="flex items-center gap-2 rounded-lg bg-red-500/80 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Circle className="h-3.5 w-3.5 fill-current" />
           Record
@@ -125,3 +123,4 @@ export function RecordingControls({
     </div>
   );
 }
+

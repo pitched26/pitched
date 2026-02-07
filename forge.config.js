@@ -4,6 +4,11 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    extendInfo: {
+      NSCameraUsageDescription: 'This app needs access to the camera for pitch analysis.',
+      NSMicrophoneUsageDescription: 'This app needs access to the microphone for pitch analysis.',
+      NSCameraUseContinuityCameraDeviceType: true,
+    },
   },
   rebuildConfig: {},
   makers: [

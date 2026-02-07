@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, session } from 'electron';
 import path from 'node:path';
 // @ts-expect-error no type declarations for this module
 import started from 'electron-squirrel-startup';
@@ -13,8 +13,7 @@ if (started) {
   app.quit();
 }
 
-const WINDOW_WIDTH = 920;
-const WINDOW_HEIGHT = 520;
+
 
 // Initialize Dedalus service
 let dedalusService: DedalusService | null = null;
@@ -78,27 +77,20 @@ const createOverlayWindow = () => {
     x: screenX,
     y: screenY,
   } = primaryDisplay.workArea;
-  const x = Math.max(
-    0,
-    screenX + Math.floor((screenWidth - WINDOW_WIDTH) / 2)
-  );
-  const y = Math.max(
-    0,
-    screenY + Math.floor((screenHeight - WINDOW_HEIGHT) / 2)
-  );
+
 
   const overlayWindow = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
-    x,
-    y,
+    width: screenWidth,
+    height: screenHeight,
+    x: screenX,
+    y: screenY,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
     resizable: true,
     hasShadow: false,
     skipTaskbar: true,
-    fullscreenable: false,
+    fullscreenable: false, // Set to true if you want actual OS fullscreen, but false usually better for overlays
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -124,6 +116,14 @@ const createOverlayWindow = () => {
 };
 
 app.whenReady().then(() => {
+  // Allow camera/microphone access
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    if (permission === 'media') {
+      return callback(true);
+    }
+    callback(false);
+  });
+
   createOverlayWindow();
 
   app.on('activate', () => {

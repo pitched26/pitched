@@ -11,24 +11,7 @@ export type {
 import type { PitchData } from '../types/pitch';
 
 export const mockPitchData: PitchData = {
-  summary: [
-    {
-      id: '1',
-      text: 'Founder is positioning the product as an AI-first dev platform.',
-    },
-    {
-      id: '2',
-      text: 'Target market mentioned: mid-size SaaS teams.',
-    },
-    {
-      id: '3',
-      text: 'Problem framing focuses on developer productivity.',
-    },
-    {
-      id: '4',
-      text: 'Positioning against legacy IDEs and generic AI coding tools.',
-    },
-  ],
+  summary: [], // Start empty so the default "Start pitching..." message shows
   signals: [
     { label: 'Market clarity', value: 'Medium' },
     { label: 'Technical depth', value: 'High' },
