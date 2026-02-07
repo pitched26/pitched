@@ -1,4 +1,5 @@
 import WebSocket from 'ws';
+import { MODE_SIGNALS } from '../types/pitch';
 import type { PitchData } from '../types/pitch';
 
 function ts(): string {
@@ -58,47 +59,52 @@ HARD ANTI-PATTERNS (never output):
   return prompt;
 }
 
-const COACHING_TOOL = {
-  type: 'function' as const,
-  name: 'provide_coaching',
-  description: 'Provide real-time micro-feedback. Tips must be 3-8 words each. Bias toward encouragement.',
-  parameters: {
-    type: 'object',
-    required: ['tips', 'signals', 'coachNote'],
-    properties: {
-      tips: {
-        type: 'array',
-        description: '1-2 micro-feedback tips. 3-8 words each. No "You said" or "You should". State observations directly.',
-        items: {
-          type: 'object',
-          required: ['id', 'text', 'category', 'priority'],
-          properties: {
-            id: { type: 'string' },
-            text: { type: 'string', description: '3-8 words. Observation or encouragement. Never start with You.' },
-            category: { type: 'string', enum: ['delivery', 'content', 'structure', 'engagement'] },
-            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+function buildCoachingTool(mode: string) {
+  const signalLabels = MODE_SIGNALS[mode] || MODE_SIGNALS.tech;
+  return {
+    type: 'function' as const,
+    name: 'provide_coaching',
+    description: 'Provide real-time micro-feedback. Tips must be 3-8 words each. Bias toward encouragement.',
+    parameters: {
+      type: 'object',
+      required: ['tips', 'signals', 'coachNote'],
+      properties: {
+        tips: {
+          type: 'array',
+          description: '1-2 micro-feedback tips. 3-8 words each. No "You said" or "You should". State observations directly.',
+          items: {
+            type: 'object',
+            required: ['id', 'text', 'category', 'priority'],
+            properties: {
+              id: { type: 'string' },
+              text: { type: 'string', description: '3-8 words. Observation or encouragement. Never start with You.' },
+              category: { type: 'string', enum: ['delivery', 'content', 'structure', 'engagement'] },
+              priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+            },
           },
         },
-      },
-      signals: {
-        type: 'array',
-        description: 'Rate Confidence, Energy, Clarity, Pace, Persuasion from the audio',
-        items: {
-          type: 'object',
-          required: ['label', 'value'],
-          properties: {
-            label: { type: 'string' },
-            value: { type: 'string', enum: ['High', 'Medium', 'Low', 'Unclear'] },
+        signals: {
+          type: 'array',
+          description: `Rate exactly these 3 signals from the audio: ${signalLabels.join(', ')}. Return all 3 every time.`,
+          items: {
+            type: 'object',
+            required: ['label', 'value'],
+            properties: {
+              label: { type: 'string', enum: signalLabels },
+              value: { type: 'string', enum: ['High', 'Medium', 'Low', 'Unclear'] },
+            },
           },
+          minItems: 3,
+          maxItems: 3,
         },
-      },
-      coachNote: {
-        type: 'string',
-        description: 'One calm sentence, 8 words max, about how the speaker sounds right now',
+        coachNote: {
+          type: 'string',
+          description: 'One calm sentence, 8 words max, about how the speaker sounds right now',
+        },
       },
     },
-  },
-};
+  };
+}
 
 // Pending analysis request waiting for the model's response
 interface PendingRequest {
@@ -196,7 +202,7 @@ export class RealtimeService {
         input_audio_format: 'pcm16',
         input_audio_transcription: { model: 'whisper-1' },
         turn_detection: null, // manual mode — we control when to get responses
-        tools: [COACHING_TOOL],
+        tools: [buildCoachingTool(this.mode)],
         tool_choice: 'required',
         temperature: 0.6,
       },

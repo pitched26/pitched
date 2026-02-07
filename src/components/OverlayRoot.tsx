@@ -5,7 +5,8 @@ import { SettingsPanel } from './SettingsPanel';
 import { Teleprompter } from './Teleprompter';
 import { RecordingControls } from './RecordingControls';
 import { PostSessionSummary } from './PostSessionSummary';
-import { mockPitchData } from '../data/mockPitch';
+import { getMockPitchData } from '../data/mockPitch';
+import { MODE_SIGNALS } from '../types/pitch';
 import { useRealtimeAnalysis } from '../hooks/useRealtimeAnalysis';
 
 export function OverlayRoot() {
@@ -32,7 +33,15 @@ export function OverlayRoot() {
   const [isPostSession, setIsPostSession] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
 
-  const displayData = pitchData ?? mockPitchData;
+  const mockData = getMockPitchData(mode);
+  const displayData = pitchData ?? mockData;
+
+  // Filter signals to only show the 3 for the current mode
+  const modeSignalLabels = MODE_SIGNALS[mode] || MODE_SIGNALS.tech;
+  const filteredSignals = modeSignalLabels.map(
+    label => displayData.signals.find(s => s.label === label) || { label, value: 'Unclear' as const }
+  );
+  const filteredDisplayData = { ...displayData, signals: filteredSignals };
 
   useEffect(() => {
     async function initCamera() {
@@ -102,8 +111,8 @@ export function OverlayRoot() {
   const generateSessionSummary = useCallback(async () => {
     // Use collected data for summary via IPC (runs in main process)
     const currentTranscript = transcript || "";
-    const tips = displayData.tips || [];
-    const signals = displayData.signals || [];
+    const tips = filteredDisplayData.tips || [];
+    const signals = filteredDisplayData.signals || [];
 
     try {
       const response = await window.pitchly.generateSummary({
@@ -123,7 +132,7 @@ export function OverlayRoot() {
       console.error('[OverlayRoot] Summary generation failed:', err);
       throw err; // PostSessionSummary will handle the fallback display
     }
-  }, [displayData, transcript, mode]);
+  }, [filteredDisplayData, transcript, mode]);
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden text-overlay-text font-sans">
@@ -143,7 +152,7 @@ export function OverlayRoot() {
       {!isPostSession && (
         <div className="absolute inset-x-0 top-0 pt-8 px-6 z-10 pointer-events-none flex justify-center animate-fade-slide">
           <UnifiedTopBar
-            data={displayData}
+            data={filteredDisplayData}
             isAnalyzing={isAnalyzing}
             pace={pace}
             tipHistory={tipHistory}
@@ -215,8 +224,8 @@ export function OverlayRoot() {
           onDiscard={handleDiscardRecording}
           onClose={() => setIsPostSession(false)}
           transcript={transcript}
-          feedbackItems={displayData.tips || []}
-          signals={displayData.signals || []}
+          feedbackItems={filteredDisplayData.tips || []}
+          signals={filteredDisplayData.signals || []}
           generateSummary={generateSessionSummary}
         />
       )}

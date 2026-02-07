@@ -16,6 +16,13 @@ export interface PitchData {
   coachNote: string;
 }
 
+// Mode-specific signal labels (3 per mode, priority order)
+export const MODE_SIGNALS: Record<string, [string, string, string]> = {
+  science: ['Clarity', 'Rigor', 'Evidence'],
+  tech: ['Confidence', 'Energy', 'Clarity'],
+  business: ['Persuasion', 'Confidence', 'Energy'],
+};
+
 // IPC channel constants
 export const IPC_CHANNELS = {
   ANALYZE_AUDIO: 'analyze-audio',
