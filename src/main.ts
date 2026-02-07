@@ -49,16 +49,12 @@ ipcMain.handle(
 
 ipcMain.handle(
   IPC_CHANNELS.ANALYZE_PITCH,
-  async (
-    _event,
-    transcript: string,
-    frameBase64: string
-  ): Promise<AnalyzeResponse> => {
+  async (_event, transcript: string): Promise<AnalyzeResponse> => {
     if (!dedalusService) {
       return { error: 'Dedalus service not initialized — API key missing' };
     }
     try {
-      const data = await dedalusService.analyzePitch(transcript, frameBase64);
+      const data = await dedalusService.analyzePitch(transcript);
       return { data };
     } catch (err) {
       const message =
