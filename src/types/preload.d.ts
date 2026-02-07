@@ -1,7 +1,8 @@
 import type { AnalyzeAudioResponse } from './pitch';
 
 export interface PitchlyAPI {
-  analyzeAudio: (audioBase64: string, priorTranscript: string) => Promise<AnalyzeAudioResponse>;
+  analyzeAudio: (audioBase64: string) => Promise<AnalyzeAudioResponse>;
+  disconnectRealtime: () => Promise<void>;
 }
 
 declare global {

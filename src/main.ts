@@ -3,7 +3,7 @@ import path from 'node:path';
 // @ts-expect-error no type declarations for this module
 import started from 'electron-squirrel-startup';
 import dotenv from 'dotenv';
-import { DedalusService } from './services/dedalusService';
+import { RealtimeService } from './services/realtimeService';
 import { IPC_CHANNELS } from './types/pitch';
 import type { AnalyzeAudioResponse } from './types/pitch';
 
@@ -13,39 +13,37 @@ if (started) {
   app.quit();
 }
 
-// Initialize Dedalus service
-let dedalusService: DedalusService | null = null;
-const apiKey = process.env.DEDALUS_API_KEY;
-if (apiKey && apiKey !== 'your_dedalus_api_key_here') {
-  dedalusService = new DedalusService(apiKey);
-  console.log('Dedalus service initialized');
+// Initialize Realtime service
+let realtimeService: RealtimeService | null = null;
+const apiKey = process.env.OPENAI_API_KEY;
+if (apiKey) {
+  realtimeService = new RealtimeService(apiKey);
+  console.log('Realtime service initialized (WebSocket connects on first use)');
 } else {
   console.warn(
-    'DEDALUS_API_KEY not set — real-time analysis disabled, using mock data'
+    'OPENAI_API_KEY not set — real-time analysis disabled, using mock data'
   );
 }
 
-// Single IPC handler: transcribe + analyze in one round-trip
+// Analyze audio: sends PCM16 to the Realtime API, gets coaching back
 let ipcCallCount = 0;
 ipcMain.handle(
   IPC_CHANNELS.ANALYZE_AUDIO,
   async (
     _event,
-    audioBase64: string,
-    priorTranscript: string
+    audioBase64: string
   ): Promise<AnalyzeAudioResponse> => {
     const callId = ++ipcCallCount;
     const now = () => new Date().toISOString();
-    console.log(`[${now()}] [IPC] analyze-audio #${callId} RECEIVED — base64=${audioBase64.length} chars (~${Math.round(audioBase64.length * 0.75)} bytes audio), priorTranscript=${priorTranscript.length} chars`);
+    console.log(`[${now()}] [IPC] analyze-audio #${callId} RECEIVED — base64=${audioBase64.length} chars`);
 
-    if (!dedalusService) {
+    if (!realtimeService) {
       console.warn(`[${now()}] [IPC] analyze-audio #${callId} SKIPPED — no API key`);
-      return { error: 'Dedalus service not initialized — API key missing' };
+      return { error: 'Realtime service not initialized — OPENAI_API_KEY missing' };
     }
     try {
       const start = performance.now();
-      const buffer = Buffer.from(audioBase64, 'base64');
-      const result = await dedalusService.analyzeAudio(buffer, priorTranscript);
+      const result = await realtimeService.analyzeAudio(audioBase64);
       const elapsed = (performance.now() - start).toFixed(0);
       console.log(`[${now()}] [IPC] analyze-audio #${callId} RESPONDED in ${elapsed}ms — transcript=${result.transcript.length} chars, tips=${result.data.tips.length}`);
       return { transcript: result.transcript, data: result.data };
@@ -57,6 +55,11 @@ ipcMain.handle(
     }
   }
 );
+
+// Disconnect the Realtime API WebSocket
+ipcMain.handle(IPC_CHANNELS.REALTIME_DISCONNECT, () => {
+  realtimeService?.disconnect();
+});
 
 const createOverlayWindow = () => {
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -120,6 +123,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  realtimeService?.disconnect();
   if (process.platform !== 'darwin') {
     app.quit();
   }

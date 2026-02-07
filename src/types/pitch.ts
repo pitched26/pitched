@@ -19,6 +19,7 @@ export interface PitchData {
 // IPC channel constants
 export const IPC_CHANNELS = {
   ANALYZE_AUDIO: 'analyze-audio',
+  REALTIME_DISCONNECT: 'realtime-disconnect',
 } as const;
 
 // Single IPC response: transcription + analysis in one shot

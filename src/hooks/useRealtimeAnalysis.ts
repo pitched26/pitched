@@ -16,17 +16,17 @@ interface RealtimeAnalysisResult extends AnalysisState {
 
 const CYCLE_MS = 2_000;
 const MAX_INFLIGHT = 3;
-const MIN_AUDIO_BYTES = 512;
-const MIN_TRANSCRIPT_LENGTH = 20;
+const MIN_AUDIO_SAMPLES = 2400; // ~100ms at 24kHz
 
 const TAG = '[Pipeline]';
 function ts(): string {
   return new Date().toISOString();
 }
 
-/** Native browser base64 encoding — delegates to C++ FileReader, avoids JS string churn */
-function blobToBase64(blob: Blob): Promise<string> {
+/** Convert ArrayBuffer to base64 via FileReader (efficient, no stack limits) */
+function arrayBufferToBase64(buffer: ArrayBuffer): Promise<string> {
   return new Promise((resolve, reject) => {
+    const blob = new Blob([buffer]);
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result as string;
@@ -46,16 +46,13 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
     tipHistory: [],
   });
 
-  // Double-buffer: two sets of chunks, alternating recorders
-  const recorderARef = useRef<MediaRecorder | null>(null);
-  const recorderBRef = useRef<MediaRecorder | null>(null);
-  const chunksARef = useRef<Blob[]>([]);
-  const chunksBRef = useRef<Blob[]>([]);
-  const currentSlotRef = useRef<'A' | 'B'>('A');
+  // Audio capture refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const pcmChunksRef = useRef<Float32Array[]>([]);
 
-  const transcriptRef = useRef('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const activeRef = useRef(false);
 
   // Pipelining refs
@@ -63,96 +60,50 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
   const lastDisplayedSeqRef = useRef(0);
   const inflightRef = useRef(0);
 
-  /** Stop a specific recorder and resolve with a complete WebM blob */
-  const stopAndCollect = useCallback((slot: 'A' | 'B'): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const recorder = slot === 'A' ? recorderARef.current : recorderBRef.current;
-      const chunks = slot === 'A' ? chunksARef : chunksBRef;
-
-      if (!recorder || recorder.state === 'inactive') {
-        resolve(new Blob([], { type: 'audio/webm' }));
-        return;
-      }
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.current.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunks.current, { type: 'audio/webm' });
-        chunks.current = [];
-        resolve(blob);
-      };
-
-      recorder.stop();
-    });
-  }, []);
-
-  /** Create and start a recorder in the given slot */
-  const startRecorderInSlot = useCallback((slot: 'A' | 'B') => {
-    const stream = streamRef.current;
-    if (!stream) return;
-
-    const audioTracks = stream.getAudioTracks();
-    if (audioTracks.length === 0) return;
-
-    const chunks = slot === 'A' ? chunksARef : chunksBRef;
-    chunks.current = [];
-
-    const audioStream = new MediaStream(audioTracks);
-    const recorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.current.push(e.data);
-    };
-
-    if (slot === 'A') {
-      recorderARef.current = recorder;
-    } else {
-      recorderBRef.current = recorder;
-    }
-
-    recorder.start();
-    console.log(`[${ts()}] ${TAG} recorder started in slot ${slot}`);
-  }, []);
-
-  /** Harvest audio from current recorder and fire a detached API call */
+  /** Collect PCM chunks, convert to Int16 base64, send to main process */
   const harvestAndFire = useCallback(async () => {
     if (!activeRef.current) return;
 
-    const harvestSlot = currentSlotRef.current;
-    const nextSlot = harvestSlot === 'A' ? 'B' : 'A';
+    // Grab accumulated PCM chunks
+    const chunks = pcmChunksRef.current;
+    pcmChunksRef.current = [];
 
-    // Start the OTHER recorder immediately, then stop current one
-    startRecorderInSlot(nextSlot);
-    currentSlotRef.current = nextSlot;
+    const totalSamples = chunks.reduce((sum, c) => sum + c.length, 0);
 
-    const audioBlob = await stopAndCollect(harvestSlot);
+    console.log(`[${ts()}] ${TAG} harvest — ${totalSamples} samples | inflight=${inflightRef.current}/${MAX_INFLIGHT}`);
 
-    console.log(`[${ts()}] ${TAG} harvest slot=${harvestSlot} → ${audioBlob.size} bytes | inflight=${inflightRef.current}/${MAX_INFLIGHT} | seq=${seqRef.current} lastDisplayed=${lastDisplayedSeqRef.current}`);
-
-    if (audioBlob.size < MIN_AUDIO_BYTES) {
-      console.log(`[${ts()}] ${TAG} SKIP — audio too small (${audioBlob.size} < ${MIN_AUDIO_BYTES})`);
+    if (totalSamples < MIN_AUDIO_SAMPLES) {
+      console.log(`[${ts()}] ${TAG} SKIP — audio too small (${totalSamples} < ${MIN_AUDIO_SAMPLES})`);
       return;
     }
     if (inflightRef.current >= MAX_INFLIGHT) {
-      console.warn(`[${ts()}] ${TAG} SKIP — inflight cap reached (${inflightRef.current}/${MAX_INFLIGHT})`);
+      console.warn(`[${ts()}] ${TAG} SKIP — inflight cap reached`);
       return;
+    }
+
+    // Convert Float32 → Int16 PCM (what OpenAI Realtime API expects)
+    const int16 = new Int16Array(totalSamples);
+    let offset = 0;
+    for (const chunk of chunks) {
+      for (let i = 0; i < chunk.length; i++) {
+        const s = Math.max(-1, Math.min(1, chunk[i]));
+        int16[offset++] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
     }
 
     const seq = ++seqRef.current;
     inflightRef.current++;
 
-    console.log(`[${ts()}] ${TAG} FIRE seq=#${seq} — blob=${audioBlob.size} bytes, transcript=${transcriptRef.current.length} chars, inflight=${inflightRef.current}`);
+    console.log(`[${ts()}] ${TAG} FIRE seq=#${seq} — ${totalSamples} samples (${int16.byteLength} bytes), inflight=${inflightRef.current}`);
     const fireTime = performance.now();
 
     setState((prev) => ({ ...prev, isAnalyzing: true, error: null }));
 
-    // Fire-and-forget — do NOT await in the interval callback
-    blobToBase64(audioBlob)
+    // Fire-and-forget — don't block the interval
+    arrayBufferToBase64(int16.buffer)
       .then((base64Audio) => {
         console.log(`[${ts()}] ${TAG} seq=#${seq} base64 ready (${base64Audio.length} chars), sending IPC…`);
-        return window.pitchly.analyzeAudio(base64Audio, transcriptRef.current);
+        return window.pitchly.analyzeAudio(base64Audio);
       })
       .then((result) => {
         inflightRef.current--;
@@ -164,7 +115,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
         }
 
         if (result.error) {
-          console.error(`[${ts()}] ${TAG} seq=#${seq} ERROR in ${roundtripMs}ms — ${result.error} | inflight=${inflightRef.current}`);
+          console.error(`[${ts()}] ${TAG} seq=#${seq} ERROR in ${roundtripMs}ms — ${result.error}`);
           setState((prev) => ({
             ...prev,
             isAnalyzing: inflightRef.current > 0,
@@ -173,20 +124,16 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
           return;
         }
 
-        if (result.transcript) {
-          transcriptRef.current = result.transcript;
-        }
-
         // Only display if this is newer than the last displayed result
         if (seq <= lastDisplayedSeqRef.current) {
-          console.log(`[${ts()}] ${TAG} seq=#${seq} STALE in ${roundtripMs}ms (lastDisplayed=#${lastDisplayedSeqRef.current}) — discarding`);
+          console.log(`[${ts()}] ${TAG} seq=#${seq} STALE in ${roundtripMs}ms — discarding`);
           return;
         }
 
         if (result.data) {
           lastDisplayedSeqRef.current = seq;
           const tips = result.data.tips;
-          console.log(`[${ts()}] ${TAG} seq=#${seq} DISPLAY in ${roundtripMs}ms — tips=[${tips.map(t => `"${t.text}"`).join(', ')}] signals=[${result.data.signals.map(s => `${s.label}:${s.value}`).join(', ')}] coachNote="${result.data.coachNote}" | inflight=${inflightRef.current}`);
+          console.log(`[${ts()}] ${TAG} seq=#${seq} DISPLAY in ${roundtripMs}ms — tips=[${tips.map(t => `"${t.text}"`).join(', ')}]`);
 
           setState((prev) => ({
             ...prev,
@@ -196,46 +143,28 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
             error: null,
             tipHistory: [...prev.tipHistory, ...result.data!.tips],
           }));
-        } else if (transcriptRef.current.length < MIN_TRANSCRIPT_LENGTH) {
-          console.log(`[${ts()}] ${TAG} seq=#${seq} NO DATA in ${roundtripMs}ms — transcript too short (${transcriptRef.current.length} chars)`);
-          setState((prev) => ({
-            ...prev,
-            isAnalyzing: inflightRef.current > 0,
-          }));
         }
       })
       .catch((err) => {
         inflightRef.current--;
-        const roundtripMs = (performance.now() - fireTime).toFixed(0);
         if (!activeRef.current) return;
         const message = err instanceof Error ? err.message : 'Analysis cycle failed';
-        console.error(`[${ts()}] ${TAG} seq=#${seq} EXCEPTION in ${roundtripMs}ms — ${message} | inflight=${inflightRef.current}`);
+        console.error(`[${ts()}] ${TAG} seq=#${seq} EXCEPTION — ${message}`);
         setState((prev) => ({
           ...prev,
           isAnalyzing: inflightRef.current > 0,
           error: message,
         }));
       });
-  }, [stopAndCollect, startRecorderInSlot]);
+  }, []);
 
   const startAnalysis = useCallback(
     (stream: MediaStream) => {
       console.log(`[${ts()}] ${TAG} ===== START ANALYSIS =====`);
       console.log(`[${ts()}] ${TAG} stream tracks: ${stream.getTracks().map(t => `${t.kind}:${t.label}`).join(', ')}`);
 
-      // Clean up any existing recorders
-      for (const ref of [recorderARef, recorderBRef]) {
-        if (ref.current && ref.current.state !== 'inactive') {
-          ref.current.stop();
-        }
-      }
-
       activeRef.current = true;
-      streamRef.current = stream;
-      chunksARef.current = [];
-      chunksBRef.current = [];
-      currentSlotRef.current = 'A';
-      transcriptRef.current = '';
+      pcmChunksRef.current = [];
       seqRef.current = 0;
       lastDisplayedSeqRef.current = 0;
       inflightRef.current = 0;
@@ -258,16 +187,35 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
         return;
       }
 
-      // Start first recorder in slot A
-      startRecorderInSlot('A');
+      // Capture PCM at 24kHz (what OpenAI Realtime API expects)
+      const audioContext = new AudioContext({ sampleRate: 24000 });
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
 
-      console.log(`[${ts()}] ${TAG} interval set: ${CYCLE_MS}ms cycles, maxInflight=${MAX_INFLIGHT}`);
-      // Uniform 2s interval — first cycle fires after 2s like all others
+      processor.onaudioprocess = (e: AudioProcessingEvent) => {
+        if (!activeRef.current) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        pcmChunksRef.current.push(new Float32Array(inputData));
+      };
+
+      source.connect(processor);
+      // Connect through silent gain node so onaudioprocess fires without playback
+      const silentGain = audioContext.createGain();
+      silentGain.gain.value = 0;
+      processor.connect(silentGain);
+      silentGain.connect(audioContext.destination);
+
+      audioContextRef.current = audioContext;
+      sourceRef.current = source;
+      processorRef.current = processor;
+
+      console.log(`[${ts()}] ${TAG} PCM capture started at 24kHz, interval: ${CYCLE_MS}ms`);
+
       intervalRef.current = setInterval(() => {
         harvestAndFire();
       }, CYCLE_MS);
     },
-    [harvestAndFire, startRecorderInSlot]
+    [harvestAndFire]
   );
 
   const stopAnalysis = useCallback(() => {
@@ -279,16 +227,17 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       intervalRef.current = null;
     }
 
-    for (const ref of [recorderARef, recorderBRef]) {
-      if (ref.current && ref.current.state !== 'inactive') {
-        ref.current.stop();
-      }
-      ref.current = null;
-    }
+    // Clean up audio nodes
+    processorRef.current?.disconnect();
+    sourceRef.current?.disconnect();
+    audioContextRef.current?.close();
+    processorRef.current = null;
+    sourceRef.current = null;
+    audioContextRef.current = null;
+    pcmChunksRef.current = [];
 
-    streamRef.current = null;
-    chunksARef.current = [];
-    chunksBRef.current = [];
+    // Disconnect the Realtime API WebSocket
+    window.pitchly.disconnectRealtime();
   }, []);
 
   useEffect(() => {
@@ -297,11 +246,9 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      for (const ref of [recorderARef, recorderBRef]) {
-        if (ref.current && ref.current.state !== 'inactive') {
-          ref.current.stop();
-        }
-      }
+      processorRef.current?.disconnect();
+      sourceRef.current?.disconnect();
+      audioContextRef.current?.close();
     };
   }, []);
 
