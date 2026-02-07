@@ -13,14 +13,6 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-Realtime_API-412991?logo=openai&logoColor=white)](https://platform.openai.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
----
-
-<img width="720" alt="Pitchly overlays your camera feed with real-time coaching" src="https://placehold.co/720x450/1a1a2e/e0e0ff?text=Pitchly+—+Live+Pitch+Coaching&font=raleway">
-
-</div>
-
----
-
 ## What is Pitchly?
 
 Pitchly is a **transparent desktop overlay** that sits on top of your camera feed and gives you **real-time, AI-powered coaching** while you practice your pitch. Think of it as a teleprompter meets speech coach — it listens to your voice, analyzes your delivery, and surfaces actionable feedback *as you speak*.
@@ -178,8 +170,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 ---
 
 <div align="center">
-
-**Built by [Vivan Poddar](mailto:vivanneil@outlook.com)**
 
 *Practice your pitch. Get better. Ship it.*
 
