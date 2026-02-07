@@ -28,12 +28,12 @@ export function SettingsPanel({
                 onClick={onClose}
             />
 
-            {/* Slide-out Panel */}
+            {/* Slide-out Floating Panel */}
             <div
-                className={`fixed top-0 bottom-0 left-0 w-[320px] z-50 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isOpen ? 'translate-x-0' : '-translate-x-full'
+                className={`fixed bottom-6 left-6 w-[340px] h-[65vh] z-50 transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-[110%] opacity-0'
                     }`}
             >
-                <GlassPanel className="h-full w-full rounded-r-2xl rounded-l-none border-r border-white/10 flex flex-col pointer-events-auto bg-black/60 shadow-2xl">
+                <GlassPanel className="h-full w-full rounded-3xl border border-white/10 flex flex-col pointer-events-auto bg-black/60 shadow-2xl overflow-hidden">
                     {/* Header */}
                     <div className="flex items-center justify-between p-5 border-b border-white/5">
                         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -62,8 +62,8 @@ export function SettingsPanel({
                                         key={m}
                                         onClick={() => setMode(m)}
                                         className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${mode === m
-                                                ? 'bg-white/20 text-white shadow-sm'
-                                                : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                                            ? 'bg-white/20 text-white shadow-sm'
+                                            : 'text-white/40 hover:text-white/70 hover:bg-white/5'
                                             }`}
                                     >
                                         {m.charAt(0).toUpperCase() + m.slice(1)}
