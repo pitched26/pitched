@@ -61,7 +61,7 @@ export function RecordingControls({
 
       timerRef.current = setInterval(() => {
         setElapsed((prev) => prev + 1);
-      }, 1000);
+      }, 500);
     } catch (err) {
       console.error('Failed to start recording:', err);
     }
