@@ -5,4 +5,6 @@ contextBridge.exposeInMainWorld('pitchly', {
     ipcRenderer.invoke('analyze-audio', audioBase64),
   disconnectRealtime: () =>
     ipcRenderer.invoke('realtime-disconnect'),
+  generateSummary: (req) =>
+    ipcRenderer.invoke('generate-summary', req),
 });

@@ -9,12 +9,15 @@ interface AnalysisState {
   error: string | null;
   tipHistory: CoachingTip[];
   pace: number; // -1 (slow) to 1 (fast), 0 = ideal
+  transcript: string;
 }
 
 interface RealtimeAnalysisResult extends AnalysisState {
   startAnalysis: (stream: MediaStream) => void;
   stopAnalysis: () => void;
 }
+
+// ... imports and constants ...
 
 const CYCLE_MS = 2_000;
 const PACE_UPDATE_MS = 100;
@@ -53,6 +56,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
     error: null,
     tipHistory: [],
     pace: 0,
+    transcript: "",
   });
 
   // Pace tracking (algorithmic, no LLM)
@@ -158,6 +162,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
             cycleCount: prev.cycleCount + 1,
             error: null,
             tipHistory: [...prev.tipHistory, ...result.data!.tips],
+            transcript: result.transcript || prev.transcript, // Update transcript
           }));
         }
       })
@@ -193,6 +198,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
         error: null,
         tipHistory: [],
         pace: 0,
+        transcript: "",
       });
 
       const audioTracks = stream.getAudioTracks();

@@ -4,13 +4,15 @@ import { Circle, Square, Video } from 'lucide-react';
 interface RecordingControlsProps {
   stream: MediaStream | null;
   onRecordingStart?: (stream: MediaStream) => void;
-  onRecordingStop?: () => void;
+  onRecordingStop?: () => void; // Called immediately on stop button click
+  onRecordingComplete?: (blob: Blob) => void; // Called when data is ready
 }
 
 export function RecordingControls({
   stream,
   onRecordingStart,
   onRecordingStop,
+  onRecordingComplete,
 }: RecordingControlsProps) {
   const [status, setStatus] = useState<'idle' | 'recording'>('idle');
   const [elapsed, setElapsed] = useState(0);
@@ -45,12 +47,17 @@ export function RecordingControls({
 
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `pitch-recording-${Date.now()}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
+        if (onRecordingComplete) {
+          onRecordingComplete(blob);
+        } else {
+          // Fallback if no handler: auto-download (legacy behavior)
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `pitch-recording-${Date.now()}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
       };
 
       mediaRecorderRef.current = recorder;

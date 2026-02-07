@@ -124,4 +124,136 @@ export class DedalusService {
 
     return { transcript: fullTranscript, data };
   }
+  /**
+   * Generate a post-session summary using GPT-4.1 Nano.
+   * 
+   * 1. Pre-LLM: Validate, trim, aggregate inputs
+   * 2. LLM Call: Dedalus API with retry
+   * 3. Post-LLM: Validate response
+   * 4. Fallback: Guaranteed local summary on failure
+   */
+  async generateSessionSummary(
+    transcript: string,
+    tips: { text: string; category: string }[],
+    signals: { label: string; value: string }[],
+    category: 'science' | 'tech' | 'business' = 'tech'
+  ): Promise<string> {
+    const callId = ++this.callCount;
+    console.log(`[${ts()}] [Summary #${callId}] START — transcript=${transcript.length} chars, tips=${tips.length}, signals=${signals.length}, category=${category}`);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 1. PRE-LLM PROCESSING
+    // ═══════════════════════════════════════════════════════════════════
+
+    const cleanTranscript = transcript.trim();
+    if (cleanTranscript.length < 50 && tips.length === 0) {
+      console.log(`[${ts()}] [Summary #${callId}] SKIP LLM — insufficient data`);
+      return this.generateLocalFallback(tips, signals, category);
+    }
+
+    const trimmedTranscript = cleanTranscript.slice(0, 3000);
+    const signalsSummary = signals.length > 0
+      ? signals.map(s => `${s.label}: ${s.value}`).join(', ')
+      : 'No signal data';
+
+    const sortedTips = [...tips].slice(0, 5);
+    const tipsSummary = sortedTips.length > 0
+      ? sortedTips.map(t => t.text).join('; ')
+      : 'No specific feedback';
+
+    const categoryContext = {
+      science: 'scientific research pitch',
+      tech: 'tech startup pitch',
+      business: 'business presentation',
+    }[category];
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 2. LLM INVOCATION
+    // ═══════════════════════════════════════════════════════════════════
+
+    const systemPrompt = `You are a world-class pitch coach giving a brief post-session debrief.
+Context: This was a ${categoryContext}.
+Your response: 2-3 sentences max. Direct ("You..."). One strength, one improvement. No headers.`;
+
+    const userPrompt = `Transcript excerpt:
+"${trimmedTranscript.slice(0, 1500)}..."
+
+Feedback: ${tipsSummary}
+Signals: ${signalsSummary}
+
+Give a concise debrief.`;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const start = performance.now();
+
+        const completion = await this.client.chat.completions.create({
+          model: 'openai/gpt-4.1-nano',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.3,
+          max_tokens: 200,
+        });
+
+        const elapsed = (performance.now() - start).toFixed(0);
+        const rawContent = completion.choices[0]?.message?.content;
+
+        console.log(`[${ts()}] [Summary #${callId}] attempt ${attempt} done in ${elapsed}ms`);
+
+        // ═══════════════════════════════════════════════════════════════
+        // 3. POST-LLM VALIDATION
+        // ═══════════════════════════════════════════════════════════════
+
+        if (!rawContent || rawContent.trim().length < 20) {
+          console.warn(`[${ts()}] [Summary #${callId}] Invalid response, retrying...`);
+          continue;
+        }
+
+        let summary = rawContent.trim();
+        summary = summary.replace(/^(Summary:|Feedback:|Debrief:|Here's|Okay,)\s*/i, '');
+        summary = summary.replace(/^["']|["']$/g, '');
+        if (summary.length > 500) summary = summary.slice(0, 500) + '...';
+
+        console.log(`[${ts()}] [Summary #${callId}] SUCCESS`);
+        return summary;
+
+      } catch (err) {
+        console.error(`[${ts()}] [Summary #${callId}] attempt ${attempt} FAILED — ${err instanceof Error ? err.message : err}`);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 4. FALLBACK
+    // ═══════════════════════════════════════════════════════════════════
+
+    console.log(`[${ts()}] [Summary #${callId}] Using local fallback`);
+    return this.generateLocalFallback(tips, signals, category);
+  }
+
+  /** Generate a deterministic local fallback summary. */
+  private generateLocalFallback(
+    tips: { text: string; category: string }[],
+    signals: { label: string; value: string }[],
+    category: 'science' | 'tech' | 'business'
+  ): string {
+    const highSignals = signals.filter(s => s.value === 'High');
+    const strength = highSignals.length > 0
+      ? `Your ${highSignals[0].label.toLowerCase()} came through strongly`
+      : 'You showed commitment to your message';
+
+    const improvementTip = tips.length > 0
+      ? tips[0].text
+      : 'focusing on pausing between key points';
+
+    const encouragement = {
+      science: 'Keep refining how you communicate your methodology.',
+      tech: 'Keep iterating on your pitch like you iterate on your product.',
+      business: 'Keep sharpening your value proposition.',
+    }[category];
+
+    return `${strength}. For your next run, try ${improvementTip.toLowerCase().replace(/^you /, '')}. ${encouragement}`;
+  }
 }

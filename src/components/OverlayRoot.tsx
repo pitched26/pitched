@@ -4,6 +4,8 @@ import { UnifiedTopBar } from './UnifiedTopBar';
 import { SettingsPanel } from './SettingsPanel';
 import { Teleprompter } from './Teleprompter';
 import { RecordingControls } from './RecordingControls';
+import { PostSessionSummary } from './PostSessionSummary';
+import { SystemToast, useToasts } from './SystemToast';
 import { mockPitchData } from '../data/mockPitch';
 import { useRealtimeAnalysis } from '../hooks/useRealtimeAnalysis';
 
@@ -13,6 +15,7 @@ export function OverlayRoot() {
     isAnalyzing,
     error,
     pace,
+    transcript, // Assuming it's exposed now or I will add it
     startAnalysis,
     stopAnalysis,
   } = useRealtimeAnalysis();
@@ -26,9 +29,15 @@ export function OverlayRoot() {
   const [mode, setMode] = useState<'science' | 'tech' | 'business'>('tech');
   const [instructions, setInstructions] = useState('');
 
+  // Post-Session State
+  const [isPostSession, setIsPostSession] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+
   // Camera Error State
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const displayError = error || cameraError;
+
+  // Toast System (decoupled error display)
+  const { toasts, showToast, dismissToast } = useToasts();
 
   const displayData = pitchData ?? mockPitchData;
 
@@ -55,8 +64,22 @@ export function OverlayRoot() {
     initCamera();
   }, []);
 
+  // Show errors as toasts (decoupled from main UI)
+  useEffect(() => {
+    if (error) {
+      showToast(error, 'soft'); // API errors are soft (transient)
+    }
+  }, [error, showToast]);
+
+  useEffect(() => {
+    if (cameraError) {
+      showToast(cameraError, 'hard'); // Camera/permission errors are hard
+    }
+  }, [cameraError, showToast]);
+
   const handleRecordingStart = useCallback(
     (s: MediaStream) => {
+      setIsPostSession(false);
       startAnalysis(s);
     },
     [startAnalysis]
@@ -64,7 +87,54 @@ export function OverlayRoot() {
 
   const handleRecordingStop = useCallback(() => {
     stopAnalysis();
+    // We wait for onRecordingComplete to trigger the summary screen
   }, [stopAnalysis]);
+
+  const handleRecordingComplete = useCallback((blob: Blob) => {
+    setRecordedBlob(blob);
+    setIsPostSession(true);
+  }, []);
+
+  const handleSaveRecording = useCallback(() => {
+    if (!recordedBlob) return;
+    const url = URL.createObjectURL(recordedBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pitch-recording-${Date.now()}.webm`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [recordedBlob]);
+
+  const handleDiscardRecording = useCallback(() => {
+    setRecordedBlob(null);
+    setIsPostSession(false);
+  }, []);
+
+  const generateSessionSummary = useCallback(async () => {
+    // Use collected data for summary via IPC (runs in main process)
+    const currentTranscript = transcript || "";
+    const tips = displayData.tips || [];
+    const signals = displayData.signals || [];
+
+    try {
+      const response = await window.pitchly.generateSummary({
+        transcript: currentTranscript,
+        tips,
+        signals,
+        category: mode, // Pass the selected pitch category
+      });
+
+      if (response.error) {
+        console.error('[OverlayRoot] Summary IPC error:', response.error);
+        throw new Error(response.error);
+      }
+
+      return response.summary || "";
+    } catch (err) {
+      console.error('[OverlayRoot] Summary generation failed:', err);
+      throw err; // PostSessionSummary will handle the fallback display
+    }
+  }, [displayData, transcript, mode]);
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden text-overlay-text font-sans">
@@ -80,14 +150,16 @@ export function OverlayRoot() {
         className="absolute inset-0 h-full w-full object-cover pointer-events-none scale-x-[-1]"
       />
 
-      {/* Main Content Area - Top Bar */}
-      <div className="absolute inset-x-0 top-0 pt-8 px-6 z-10 pointer-events-none flex justify-center">
-        <UnifiedTopBar
-          data={displayData}
-          isAnalyzing={isAnalyzing}
-          pace={pace}
-        />
-      </div>
+      {/* Main Content Area - Top Bar (Hidden in Post-Session) */}
+      {!isPostSession && (
+        <div className="absolute inset-x-0 top-0 pt-8 px-6 z-10 pointer-events-none flex justify-center animate-fade-slide">
+          <UnifiedTopBar
+            data={displayData}
+            isAnalyzing={isAnalyzing}
+            pace={pace}
+          />
+        </div>
+      )}
 
       {/* Drag & Move Handle */}
       <div
@@ -97,42 +169,41 @@ export function OverlayRoot() {
         <div className="w-12 h-1 rounded-full bg-white/20 group-hover:bg-white/40 transition-colors" />
       </div>
 
-      {/* Bottom Controls Area */}
-      <div className="fixed bottom-0 left-0 right-0 p-8 flex items-end justify-between z-20 pointer-events-none">
+      {/* Bottom Controls Area (Hidden in Post-Session) */}
+      {!isPostSession && (
+        <div className="fixed bottom-0 left-0 right-0 p-8 flex items-end justify-between z-20 pointer-events-none animate-fade-slide">
 
-        {/* Settings Trigger */}
-        <button
-          onClick={() => setIsSettingsOpen(true)}
-          className="pointer-events-auto p-3 rounded-full bg-black/20 text-white/50 hover:text-white hover:bg-black/40 backdrop-blur-md border border-white/5 transition-all duration-300 group shadow-lg"
-        >
-          <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
-        </button>
+          {/* Settings Trigger */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="pointer-events-auto p-3 rounded-full bg-black/20 text-white/50 hover:text-white hover:bg-black/40 backdrop-blur-md border border-white/5 transition-all duration-300 group shadow-lg"
+          >
+            <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
+          </button>
 
-        {/* Recording Controls */}
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-8 pointer-events-auto">
-          <RecordingControls
-            stream={stream}
-            onRecordingStart={handleRecordingStart}
-            onRecordingStop={handleRecordingStop}
-          />
-        </div>
+          {/* Recording Controls */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-8 pointer-events-auto">
+            <RecordingControls
+              stream={stream}
+              onRecordingStart={handleRecordingStart}
+              onRecordingStop={handleRecordingStop}
+              onRecordingComplete={handleRecordingComplete}
+            />
+          </div>
 
-        {/* Teleprompter Trigger */}
-        <button
-          onClick={() => setIsTeleprompterOpen(!isTeleprompterOpen)}
-          className={`pointer-events-auto p-3 rounded-full backdrop-blur-md border border-white/5 transition-all duration-300 group shadow-lg ${isTeleprompterOpen ? 'bg-white/20 text-white' : 'bg-black/20 text-white/50 hover:text-white hover:bg-black/40'
-            }`}
-        >
-          <FileText className="w-6 h-6" />
-        </button>
-      </div>
-
-      {/* Error Toast */}
-      {displayError && (
-        <div className="pointer-events-auto fixed top-32 left-1/2 -translate-x-1/2 rounded-lg border border-rose-500/30 bg-rose-500/20 px-4 py-2 text-sm text-rose-300 backdrop-blur-sm z-50 animate-fade-slide">
-          {displayError}
+          {/* Teleprompter Trigger */}
+          <button
+            onClick={() => setIsTeleprompterOpen(!isTeleprompterOpen)}
+            className={`pointer-events-auto p-3 rounded-full backdrop-blur-md border border-white/5 transition-all duration-300 group shadow-lg ${isTeleprompterOpen ? 'bg-white/20 text-white' : 'bg-black/20 text-white/50 hover:text-white hover:bg-black/40'
+              }`}
+          >
+            <FileText className="w-6 h-6" />
+          </button>
         </div>
       )}
+
+      {/* System Toast Layer (top-right, independent) */}
+      <SystemToast toasts={toasts} onDismiss={dismissToast} />
 
       {/* Slide-out Settings Panel */}
       <SettingsPanel
@@ -146,9 +217,22 @@ export function OverlayRoot() {
 
       {/* Teleprompter Overlay */}
       <Teleprompter
-        isOpen={isTeleprompterOpen}
+        isOpen={isTeleprompterOpen && !isPostSession}
         onClose={() => setIsTeleprompterOpen(false)}
       />
+
+      {/* Post-Session Summary Screen */}
+      {isPostSession && (
+        <PostSessionSummary
+          onSave={handleSaveRecording}
+          onDiscard={handleDiscardRecording}
+          onClose={() => setIsPostSession(false)}
+          transcript={transcript}
+          feedbackItems={displayData.tips || []}
+          signals={displayData.signals || []}
+          generateSummary={generateSessionSummary}
+        />
+      )}
     </div>
   );
 }

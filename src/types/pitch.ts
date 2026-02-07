@@ -20,11 +20,24 @@ export interface PitchData {
 export const IPC_CHANNELS = {
   ANALYZE_AUDIO: 'analyze-audio',
   REALTIME_DISCONNECT: 'realtime-disconnect',
+  GENERATE_SUMMARY: 'generate-summary',
 } as const;
 
 // Single IPC response: transcription + analysis in one shot
 export interface AnalyzeAudioResponse {
   transcript?: string;
   data?: PitchData;
+  error?: string;
+}
+
+export interface GenerateSummaryRequest {
+  transcript: string;
+  tips: { text: string; category: string }[];
+  signals: Signal[];
+  category: 'science' | 'tech' | 'business';
+}
+
+export interface GenerateSummaryResponse {
+  summary?: string;
   error?: string;
 }

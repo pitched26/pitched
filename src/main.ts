@@ -4,8 +4,9 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import dotenv from 'dotenv';
 import { RealtimeService } from './services/realtimeService';
+import { DedalusService } from './services/dedalusService';
 import { IPC_CHANNELS } from './types/pitch';
-import type { AnalyzeAudioResponse } from './types/pitch';
+import type { AnalyzeAudioResponse, GenerateSummaryRequest, GenerateSummaryResponse } from './types/pitch';
 
 dotenv.config();
 
@@ -61,6 +62,29 @@ ipcMain.handle(IPC_CHANNELS.REALTIME_DISCONNECT, () => {
   realtimeService?.disconnect();
 });
 
+// Generate Session Summary
+let dedalusService: DedalusService | null = null;
+const dedalusApiKey = process.env.DEDALUS_API_KEY || process.env.OPENAI_API_KEY; // Fallback
+if (dedalusApiKey) {
+  dedalusService = new DedalusService(dedalusApiKey);
+} else {
+  console.warn("DEDALUS_API_KEY not set - summary generation may fail");
+}
+
+ipcMain.handle(IPC_CHANNELS.GENERATE_SUMMARY, async (_event, req: GenerateSummaryRequest): Promise<GenerateSummaryResponse> => {
+  if (!dedalusService) {
+    return { error: "Service not configured" };
+  }
+  try {
+    console.log(`[IPC] Generating summary for transcript length ${req.transcript.length}, category=${req.category}`);
+    const summary = await dedalusService.generateSessionSummary(req.transcript, req.tips, req.signals, req.category);
+    return { summary };
+  } catch (error) {
+    console.error("Summary generation failed:", error);
+    return { error: error instanceof Error ? error.message : "Likely network or API error" };
+  }
+});
+
 const createOverlayWindow = () => {
   const primaryDisplay = screen.getPrimaryDisplay();
   const {
@@ -77,7 +101,7 @@ const createOverlayWindow = () => {
     y: screenY,
     transparent: true,
     frame: false,
-    alwaysOnTop: true,
+    alwaysOnTop: false, // Start as normal window, not always-on-top
     resizable: true,
     hasShadow: false,
     skipTaskbar: true,
@@ -91,6 +115,24 @@ const createOverlayWindow = () => {
   });
 
   overlayWindow.setBackgroundColor('#00000000');
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // macOS-Native Focus Behavior
+  // When focused: optionally float above other windows (user is active)
+  // When blurred: yield to OS window manager (polite behavior)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  overlayWindow.on('focus', () => {
+    // When user clicks into our app, bring it to front naturally
+    // We do NOT set alwaysOnTop here — let the OS manage z-order
+    console.log('[Window] Focused');
+  });
+
+  overlayWindow.on('blur', () => {
+    // When user clicks elsewhere, ensure we don't fight for focus
+    // This is already the default behavior when alwaysOnTop is false
+    console.log('[Window] Lost focus — yielding to OS');
+  });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     overlayWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
