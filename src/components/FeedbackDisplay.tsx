@@ -11,9 +11,8 @@ interface FeedbackDisplayProps {
 }
 
 export function FeedbackDisplay({ data, isAnalyzing, wpm = 0 }: FeedbackDisplayProps) {
-    // Extract latest summary or a prioritized feedback item
-    const latestFeedback = data.summary.length > 0
-        ? data.summary[0].text
+    const latestFeedback = data.tips.length > 0
+        ? data.tips[0].text
         : isAnalyzing
             ? "Listening to your pitch..."
             : "Ready to start";

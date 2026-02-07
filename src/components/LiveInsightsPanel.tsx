@@ -21,7 +21,7 @@ export function LiveInsightsPanel({
       {/* Header / Status */}
       <div className="flex items-center gap-3 shrink-0">
         <h2 className="text-sm font-semibold text-overlay-text whitespace-nowrap">
-          ✨ Live Insights
+          Live Insights
         </h2>
         {isAnalyzing && (
           <span className="flex items-center gap-1.5 text-xs text-overlay-accent whitespace-nowrap">
@@ -45,14 +45,14 @@ export function LiveInsightsPanel({
           </div>
         )}
 
-        {/* Latest Insight / Summary - Truncated */}
+        {/* Latest Tip */}
         <div className="flex flex-1 items-center gap-3 min-w-0 border-l border-white/10 pl-6">
           <span className="text-xs font-semibold uppercase tracking-wider text-overlay-text-muted shrink-0">
             Latest
           </span>
-          {data.summary.length > 0 ? (
+          {data.tips.length > 0 ? (
             <p className="truncate text-sm text-overlay-text leading-snug">
-              {data.summary[0].text}
+              {data.tips[0].text}
             </p>
           ) : (
             <p className="text-sm text-overlay-text-muted italic">

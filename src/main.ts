@@ -5,15 +5,13 @@ import started from 'electron-squirrel-startup';
 import dotenv from 'dotenv';
 import { DedalusService } from './services/dedalusService';
 import { IPC_CHANNELS } from './types/pitch';
-import type { TranscribeResponse, AnalyzeResponse } from './types/pitch';
+import type { AnalyzeAudioResponse } from './types/pitch';
 
 dotenv.config();
 
 if (started) {
   app.quit();
 }
-
-
 
 // Initialize Dedalus service
 let dedalusService: DedalusService | null = null;
@@ -27,39 +25,34 @@ if (apiKey && apiKey !== 'your_dedalus_api_key_here') {
   );
 }
 
-// IPC Handlers
+// Single IPC handler: transcribe + analyze in one round-trip
+let ipcCallCount = 0;
 ipcMain.handle(
-  IPC_CHANNELS.TRANSCRIBE_AUDIO,
-  async (_event, audioBase64: string): Promise<TranscribeResponse> => {
-    if (!dedalusService) {
-      return { error: 'Dedalus service not initialized — API key missing' };
-    }
-    try {
-      const buffer = Buffer.from(audioBase64, 'base64');
-      const text = await dedalusService.transcribeAudio(buffer);
-      return { text };
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Transcription failed';
-      console.warn('Transcription error:', message);
-      return { error: message };
-    }
-  }
-);
+  IPC_CHANNELS.ANALYZE_AUDIO,
+  async (
+    _event,
+    audioBase64: string,
+    priorTranscript: string
+  ): Promise<AnalyzeAudioResponse> => {
+    const callId = ++ipcCallCount;
+    const now = () => new Date().toISOString();
+    console.log(`[${now()}] [IPC] analyze-audio #${callId} RECEIVED — base64=${audioBase64.length} chars (~${Math.round(audioBase64.length * 0.75)} bytes audio), priorTranscript=${priorTranscript.length} chars`);
 
-ipcMain.handle(
-  IPC_CHANNELS.ANALYZE_PITCH,
-  async (_event, transcript: string): Promise<AnalyzeResponse> => {
     if (!dedalusService) {
+      console.warn(`[${now()}] [IPC] analyze-audio #${callId} SKIPPED — no API key`);
       return { error: 'Dedalus service not initialized — API key missing' };
     }
     try {
-      const data = await dedalusService.analyzePitch(transcript);
-      return { data };
+      const start = performance.now();
+      const buffer = Buffer.from(audioBase64, 'base64');
+      const result = await dedalusService.analyzeAudio(buffer, priorTranscript);
+      const elapsed = (performance.now() - start).toFixed(0);
+      console.log(`[${now()}] [IPC] analyze-audio #${callId} RESPONDED in ${elapsed}ms — transcript=${result.transcript.length} chars, tips=${result.data.tips.length}`);
+      return { transcript: result.transcript, data: result.data };
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Analysis failed';
-      console.warn('Analysis error:', message);
+      console.error(`[${now()}] [IPC] analyze-audio #${callId} ERROR — ${message}`);
       return { error: message };
     }
   }
@@ -74,7 +67,6 @@ const createOverlayWindow = () => {
     y: screenY,
   } = primaryDisplay.workArea;
 
-
   const overlayWindow = new BrowserWindow({
     width: screenWidth,
     height: screenHeight,
@@ -86,7 +78,7 @@ const createOverlayWindow = () => {
     resizable: true,
     hasShadow: false,
     skipTaskbar: true,
-    fullscreenable: false, // Set to true if you want actual OS fullscreen, but false usually better for overlays
+    fullscreenable: false,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -95,7 +87,6 @@ const createOverlayWindow = () => {
     titleBarStyle: 'hidden',
   });
 
-  // Force fully transparent window (no vibrancy tint on macOS)
   overlayWindow.setBackgroundColor('#00000000');
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -112,7 +103,6 @@ const createOverlayWindow = () => {
 };
 
 app.whenReady().then(() => {
-  // Allow camera/microphone access
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     if (permission === 'media') {
       return callback(true);

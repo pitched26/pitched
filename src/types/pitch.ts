@@ -1,6 +1,8 @@
-export interface PitchSummaryItem {
+export interface CoachingTip {
   id: string;
   text: string;
+  category: 'delivery' | 'content' | 'structure' | 'engagement';
+  priority: 'high' | 'medium' | 'low';
 }
 
 export interface Signal {
@@ -8,51 +10,20 @@ export interface Signal {
   value: 'High' | 'Medium' | 'Low' | 'Unclear';
 }
 
-export interface FollowUpPrompt {
-  id: string;
-  label: string;
-}
-
-export interface CompanyOverview {
-  name: string;
-  category: string;
-  valueProposition: string;
-}
-
-export interface TractionMetrics {
-  arr?: string;
-  customerCount?: string;
-  growthSignals: string[];
-}
-
-export interface RiskFlag {
-  id: string;
-  text: string;
-}
-
 export interface PitchData {
-  summary: PitchSummaryItem[];
+  tips: CoachingTip[];
   signals: Signal[];
-  followUps: FollowUpPrompt[];
-  company: CompanyOverview;
-  traction: TractionMetrics;
-  riskFlags: RiskFlag[];
-  analystNotes: string;
+  coachNote: string;
 }
 
 // IPC channel constants
 export const IPC_CHANNELS = {
-  TRANSCRIBE_AUDIO: 'transcribe-audio',
-  ANALYZE_PITCH: 'analyze-pitch',
+  ANALYZE_AUDIO: 'analyze-audio',
 } as const;
 
-// IPC response shapes
-export interface TranscribeResponse {
-  text?: string;
-  error?: string;
-}
-
-export interface AnalyzeResponse {
+// Single IPC response: transcription + analysis in one shot
+export interface AnalyzeAudioResponse {
+  transcript?: string;
   data?: PitchData;
   error?: string;
 }

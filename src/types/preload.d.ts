@@ -1,8 +1,7 @@
-import type { TranscribeResponse, AnalyzeResponse } from './pitch';
+import type { AnalyzeAudioResponse } from './pitch';
 
 export interface PitchlyAPI {
-  transcribeAudio: (audioBase64: string) => Promise<TranscribeResponse>;
-  analyzePitch: (transcript: string) => Promise<AnalyzeResponse>;
+  analyzeAudio: (audioBase64: string, priorTranscript: string) => Promise<AnalyzeAudioResponse>;
 }
 
 declare global {

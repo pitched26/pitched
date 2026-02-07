@@ -1,20 +1,32 @@
 import React from 'react';
 import { GlassPanel } from './GlassPanel';
-import type { PitchData } from '../data/mockPitch';
+import type { PitchData, CoachingTip } from '../data/mockPitch';
+
+const CATEGORY_COLORS: Record<CoachingTip['category'], string> = {
+  delivery: 'bg-violet-400/20 text-violet-300',
+  content: 'bg-sky-400/20 text-sky-300',
+  structure: 'bg-amber-400/20 text-amber-300',
+  engagement: 'bg-emerald-400/20 text-emerald-300',
+};
+
+const PRIORITY_BORDER: Record<CoachingTip['priority'], string> = {
+  high: 'border-l-rose-400',
+  medium: 'border-l-amber-400',
+  low: 'border-l-white/20',
+};
 
 interface PitchAnalysisPanelProps {
   data: PitchData;
+  tipHistory: CoachingTip[];
   isAnalyzing?: boolean;
 }
 
-export function PitchAnalysisPanel({ data, isAnalyzing }: PitchAnalysisPanelProps) {
-  const { company, traction, riskFlags, analystNotes } = data;
-
+export function PitchAnalysisPanel({ data, tipHistory, isAnalyzing }: PitchAnalysisPanelProps) {
   return (
     <GlassPanel className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b border-overlay-border px-4 py-3">
         <h2 className="text-sm font-semibold text-overlay-text">
-          Pitch Analysis
+          Coach Notes
         </h2>
         {isAnalyzing && (
           <span className="flex items-center gap-1 text-xs text-overlay-accent">
@@ -24,57 +36,42 @@ export function PitchAnalysisPanel({ data, isAnalyzing }: PitchAnalysisPanelProp
       </header>
 
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-overlay-text-muted">
-            Company Overview
-          </h3>
-          <div className="space-y-1.5 text-sm">
-            <p className="font-medium text-overlay-text">{company.name}</p>
-            <p className="text-overlay-text-muted">{company.category}</p>
-            <p className="leading-snug text-overlay-text">
-              {company.valueProposition}
+        {/* Coach Note — one-liner impression */}
+        {data.coachNote && (
+          <section>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-overlay-text-muted">
+              Overall Impression
+            </h3>
+            <p className="text-sm leading-relaxed text-overlay-text">
+              {data.coachNote}
             </p>
-          </div>
-        </section>
+          </section>
+        )}
 
+        {/* Tip History */}
         <section>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-overlay-text-muted">
-            Traction & Metrics
+            Coaching Tips
           </h3>
-          <div className="space-y-1.5 text-sm text-overlay-text">
-            {traction.arr && <p>{traction.arr}</p>}
-            {traction.customerCount && <p>{traction.customerCount}</p>}
-            {traction.growthSignals.length > 0 && (
-              <ul className="list-disc space-y-0.5 pl-4 text-overlay-text-muted">
-                {traction.growthSignals.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
-
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-overlay-text-muted">
-            Risk Flags
-          </h3>
-          <ul className="space-y-1 text-sm text-overlay-text">
-            {riskFlags.map((flag) => (
-              <li key={flag.id} className="flex gap-2">
-                <span className="text-rose-400/90">•</span>
-                {flag.text}
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="border-t border-overlay-border pt-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-overlay-text-muted">
-            Analyst Notes
-          </h3>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-overlay-text">
-            {analystNotes}
-          </p>
+          {tipHistory.length > 0 ? (
+            <ul className="space-y-2">
+              {tipHistory.map((tip, i) => (
+                <li
+                  key={`${tip.id}-${i}`}
+                  className={`flex items-start gap-2 border-l-2 pl-3 py-1 ${PRIORITY_BORDER[tip.priority]}`}
+                >
+                  <span className={`shrink-0 mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${CATEGORY_COLORS[tip.category]}`}>
+                    {tip.category}
+                  </span>
+                  <span className="text-sm text-overlay-text">{tip.text}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-overlay-text-muted italic">
+              Tips will appear here as you speak...
+            </p>
+          )}
         </section>
       </div>
     </GlassPanel>

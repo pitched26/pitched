@@ -11,9 +11,8 @@ interface UnifiedTopBarProps {
 }
 
 export function UnifiedTopBar({ data, isAnalyzing, wpm = 0 }: UnifiedTopBarProps) {
-    // Extract latest summary or a prioritized feedback item
-    const latestFeedback = data.summary.length > 0
-        ? data.summary[0].text
+    const latestFeedback = data.tips.length > 0
+        ? data.tips[0].text
         : isAnalyzing
             ? "Listening for your pitch..."
             : "Start pitching for real-time feedback...";
