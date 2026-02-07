@@ -12,6 +12,7 @@ export function OverlayRoot() {
     pitchData,
     isAnalyzing,
     error,
+    pace,
     startAnalysis,
     stopAnalysis,
   } = useRealtimeAnalysis();
@@ -84,7 +85,7 @@ export function OverlayRoot() {
         <UnifiedTopBar
           data={displayData}
           isAnalyzing={isAnalyzing}
-          wpm={140}
+          pace={pace}
         />
       </div>
 

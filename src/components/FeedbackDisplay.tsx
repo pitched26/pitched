@@ -7,10 +7,10 @@ import type { PitchData } from '../data/mockPitch';
 interface FeedbackDisplayProps {
     data: PitchData;
     isAnalyzing: boolean;
-    wpm?: number;
+    pace?: number;
 }
 
-export function FeedbackDisplay({ data, isAnalyzing, wpm = 0 }: FeedbackDisplayProps) {
+export function FeedbackDisplay({ data, isAnalyzing, pace = 0 }: FeedbackDisplayProps) {
     const latestFeedback = data.tips.length > 0
         ? data.tips[0].text
         : isAnalyzing
@@ -40,7 +40,7 @@ export function FeedbackDisplay({ data, isAnalyzing, wpm = 0 }: FeedbackDisplayP
 
                 <div className="h-4 w-px bg-white/10" />
 
-                <SpeedIndicator wpm={wpm} isSpeaking={isAnalyzing} />
+                <SpeedIndicator pace={pace} isSpeaking={isAnalyzing} />
             </GlassPanel>
 
             {/* Primary Feedback Line */}

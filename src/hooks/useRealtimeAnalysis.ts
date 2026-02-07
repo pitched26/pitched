@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { PitchData, CoachingTip } from '../types/pitch';
+import { PaceTracker } from '../utils/paceTracker';
 
 interface AnalysisState {
   pitchData: PitchData | null;
@@ -7,6 +8,7 @@ interface AnalysisState {
   cycleCount: number;
   error: string | null;
   tipHistory: CoachingTip[];
+  pace: number; // -1 (slow) to 1 (fast), 0 = ideal
 }
 
 interface RealtimeAnalysisResult extends AnalysisState {
@@ -15,12 +17,18 @@ interface RealtimeAnalysisResult extends AnalysisState {
 }
 
 const CYCLE_MS = 2_000;
+const PACE_UPDATE_MS = 100;
 const MAX_INFLIGHT = 3;
 const MIN_AUDIO_SAMPLES = 2400; // ~100ms at 24kHz
 
 const TAG = '[Pipeline]';
 function ts(): string {
   return new Date().toISOString();
+}
+
+function countWords(text: string): number {
+  if (!text) return 0;
+  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 /** Convert ArrayBuffer to base64 via FileReader (efficient, no stack limits) */
@@ -44,7 +52,13 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
     cycleCount: 0,
     error: null,
     tipHistory: [],
+    pace: 0,
   });
+
+  // Pace tracking (algorithmic, no LLM)
+  const paceTrackerRef = useRef(new PaceTracker());
+  const prevWordCountRef = useRef(0);
+  const paceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Audio capture refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -102,17 +116,13 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
     // Fire-and-forget — don't block the interval
     arrayBufferToBase64(int16.buffer)
       .then((base64Audio) => {
-        console.log(`[${ts()}] ${TAG} seq=#${seq} base64 ready (${base64Audio.length} chars), sending IPC…`);
         return window.pitchly.analyzeAudio(base64Audio);
       })
       .then((result) => {
         inflightRef.current--;
         const roundtripMs = (performance.now() - fireTime).toFixed(0);
 
-        if (!activeRef.current) {
-          console.log(`[${ts()}] ${TAG} seq=#${seq} ARRIVED in ${roundtripMs}ms but session stopped — discarding`);
-          return;
-        }
+        if (!activeRef.current) return;
 
         if (result.error) {
           console.error(`[${ts()}] ${TAG} seq=#${seq} ERROR in ${roundtripMs}ms — ${result.error}`);
@@ -125,15 +135,21 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
         }
 
         // Only display if this is newer than the last displayed result
-        if (seq <= lastDisplayedSeqRef.current) {
-          console.log(`[${ts()}] ${TAG} seq=#${seq} STALE in ${roundtripMs}ms — discarding`);
-          return;
+        if (seq <= lastDisplayedSeqRef.current) return;
+
+        // Feed new words to PaceTracker
+        if (result.transcript) {
+          const totalWords = countWords(result.transcript);
+          const newWords = totalWords - prevWordCountRef.current;
+          if (newWords > 0) {
+            paceTrackerRef.current.addWords(newWords, performance.now());
+            prevWordCountRef.current = totalWords;
+          }
         }
 
         if (result.data) {
           lastDisplayedSeqRef.current = seq;
-          const tips = result.data.tips;
-          console.log(`[${ts()}] ${TAG} seq=#${seq} DISPLAY in ${roundtripMs}ms — tips=[${tips.map(t => `"${t.text}"`).join(', ')}]`);
+          console.log(`[${ts()}] ${TAG} seq=#${seq} DISPLAY in ${roundtripMs}ms — tips=[${result.data.tips.map(t => `"${t.text}"`).join(', ')}]`);
 
           setState((prev) => ({
             ...prev,
@@ -161,13 +177,14 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
   const startAnalysis = useCallback(
     (stream: MediaStream) => {
       console.log(`[${ts()}] ${TAG} ===== START ANALYSIS =====`);
-      console.log(`[${ts()}] ${TAG} stream tracks: ${stream.getTracks().map(t => `${t.kind}:${t.label}`).join(', ')}`);
 
       activeRef.current = true;
       pcmChunksRef.current = [];
       seqRef.current = 0;
       lastDisplayedSeqRef.current = 0;
       inflightRef.current = 0;
+      prevWordCountRef.current = 0;
+      paceTrackerRef.current.reset();
 
       setState({
         pitchData: null,
@@ -175,15 +192,12 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
         cycleCount: 0,
         error: null,
         tipHistory: [],
+        pace: 0,
       });
 
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
-        console.error(`[${ts()}] ${TAG} No audio tracks — aborting`);
-        setState((prev) => ({
-          ...prev,
-          error: 'No audio track available for analysis',
-        }));
+        setState((prev) => ({ ...prev, error: 'No audio track available for analysis' }));
         return;
       }
 
@@ -199,7 +213,6 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       };
 
       source.connect(processor);
-      // Connect through silent gain node so onaudioprocess fires without playback
       const silentGain = audioContext.createGain();
       silentGain.gain.value = 0;
       processor.connect(silentGain);
@@ -209,25 +222,38 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       sourceRef.current = source;
       processorRef.current = processor;
 
-      console.log(`[${ts()}] ${TAG} PCM capture started at 24kHz, interval: ${CYCLE_MS}ms`);
-
+      // Audio harvest cycle (2s)
       intervalRef.current = setInterval(() => {
         harvestAndFire();
       }, CYCLE_MS);
+
+      // Pace update loop (200ms) — runs independently of LLM responses
+      paceIntervalRef.current = setInterval(() => {
+        if (!activeRef.current) return;
+        const raw = paceTrackerRef.current.update(performance.now());
+        const rounded = Math.round(raw * 100) / 100;
+        setState((prev) => {
+          if (prev.pace === rounded) return prev; // skip no-op render
+          return { ...prev, pace: rounded };
+        });
+      }, PACE_UPDATE_MS);
     },
     [harvestAndFire]
   );
 
   const stopAnalysis = useCallback(() => {
-    console.log(`[${ts()}] ${TAG} ===== STOP ANALYSIS ===== seq=${seqRef.current} lastDisplayed=${lastDisplayedSeqRef.current} inflight=${inflightRef.current}`);
+    console.log(`[${ts()}] ${TAG} ===== STOP ANALYSIS =====`);
     activeRef.current = false;
 
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    if (paceIntervalRef.current) {
+      clearInterval(paceIntervalRef.current);
+      paceIntervalRef.current = null;
+    }
 
-    // Clean up audio nodes
     processorRef.current?.disconnect();
     sourceRef.current?.disconnect();
     audioContextRef.current?.close();
@@ -236,16 +262,14 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
     audioContextRef.current = null;
     pcmChunksRef.current = [];
 
-    // Disconnect the Realtime API WebSocket
     window.pitchly.disconnectRealtime();
   }, []);
 
   useEffect(() => {
     return () => {
       activeRef.current = false;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (paceIntervalRef.current) clearInterval(paceIntervalRef.current);
       processorRef.current?.disconnect();
       sourceRef.current?.disconnect();
       audioContextRef.current?.close();

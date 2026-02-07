@@ -7,10 +7,10 @@ import type { PitchData } from '../data/mockPitch';
 interface UnifiedTopBarProps {
     data: PitchData;
     isAnalyzing: boolean;
-    wpm?: number;
+    pace?: number;
 }
 
-export function UnifiedTopBar({ data, isAnalyzing, wpm = 0 }: UnifiedTopBarProps) {
+export function UnifiedTopBar({ data, isAnalyzing, pace = 0 }: UnifiedTopBarProps) {
     const latestFeedback = data.tips.length > 0
         ? data.tips[0].text
         : isAnalyzing
@@ -22,7 +22,7 @@ export function UnifiedTopBar({ data, isAnalyzing, wpm = 0 }: UnifiedTopBarProps
 
             {/* TOP ROW: Speed Indicator */}
             <div className="flex justify-center w-full opacity-90 scale-90">
-                <SpeedIndicator wpm={wpm} isSpeaking={isAnalyzing} />
+                <SpeedIndicator pace={pace} isSpeaking={isAnalyzing} />
             </div>
 
             {/* MIDDLE ROW: Primary Feedback (Dominant) */}
