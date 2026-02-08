@@ -65,7 +65,7 @@ export function Teleprompter({ isOpen, onClose }: TeleprompterProps) {
 
         const scroll = () => {
             if (scrollRef.current) {
-                scrollRef.current.scrollTop += 0.5 * speed;
+                scrollRef.current.scrollTop += 0.3 * speed;
             }
             animationFrameRef.current = requestAnimationFrame(scroll);
         };
