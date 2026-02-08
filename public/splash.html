@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pitched</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            -webkit-user-select: none;
+            cursor: default;
+        }
+
+        .logo-container {
+            width: 360px;
+            opacity: 0;
+            transform: scale(0.96);
+            /* Apple-like easing: easeOutQuart or similar */
+            animation: intro 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .logo-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+            /* Ensure crisp rendering */
+            image-rendering: -webkit-optimize-contrast;
+        }
+
+        @keyframes intro {
+            0% {
+                opacity: 0;
+                transform: scale(0.96);
+                filter: blur(2px);
+            }
+
+            40% {
+                opacity: 1;
+                filter: blur(0px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Fade-out animation triggered before close */
+        .fade-out {
+            animation: fadeOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="logo-container">
+        <img src="pitched (1).svg" alt="Pitched" draggable="false" style="width: 100%; height: auto;">
+    </div>
+</body>
+
+</html>
