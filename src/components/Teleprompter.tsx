@@ -138,7 +138,10 @@ export function Teleprompter({ isOpen, onClose }: TeleprompterProps) {
                 height: size.h
             }}
         >
-            <GlassPanel className="flex flex-col h-full rounded-2xl bg-black/40 border-white/10 backdrop-blur-xl overflow-hidden relative group">
+            <GlassPanel
+                variant="elevated"
+                className="flex flex-col h-full rounded-2xl bg-white/[0.08] border-white/[0.12] backdrop-blur-[48px] overflow-hidden relative group shadow-[0_16px_48px_rgba(0,0,0,0.12)]"
+            >
                 {/* Header - Draggable Area */}
                 <div
                     className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/5 cursor-grab active:cursor-grabbing select-none"
@@ -159,7 +162,7 @@ export function Teleprompter({ isOpen, onClose }: TeleprompterProps) {
 
                     <button
                         onClick={onClose}
-                        className="hover:text-white text-white/50 transition-colors pointer-events-auto ml-2"
+                        className="hover:text-white text-white/50 glass-transition-fast pointer-events-auto ml-2"
                         onMouseDown={(e) => e.stopPropagation()}
                     >
                         <X className="w-4 h-4" />
@@ -167,7 +170,7 @@ export function Teleprompter({ isOpen, onClose }: TeleprompterProps) {
                 </div>
 
                 {/* Text Area */}
-                <div className="relative flex-1 bg-black/20 min-h-0">
+                <div className="relative flex-1 bg-black/10 min-h-0">
                     <textarea
                         ref={scrollRef}
                         value={text}
@@ -176,15 +179,15 @@ export function Teleprompter({ isOpen, onClose }: TeleprompterProps) {
                         placeholder="Paste script here..."
                     />
                     {/* Gradient Overlays for Fade Effect */}
-                    <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+                    <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
                 </div>
 
                 {/* Controls */}
                 <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 bg-white/5 select-none text-white">
                     <button
                         onClick={() => setIsPlaying(!isPlaying)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${isPlaying ? 'bg-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'bg-white/10 text-white hover:bg-white/20'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold glass-transition-fast ${isPlaying ? 'bg-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.5)] scale-[1.02]' : 'bg-white/10 text-white hover:bg-white/15 hover:scale-[1.02]'
                             }`}
                     >
                         {isPlaying ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}

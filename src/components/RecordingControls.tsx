@@ -94,39 +94,35 @@ export function RecordingControls({
 
   return (
     <div
-      className="pointer-events-auto inline-flex items-center gap-3 rounded-panel border border-overlay-border bg-overlay-bg px-4 py-2.5 shadow-panel backdrop-blur-[20px]"
-      style={{
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-      }}
+      className="pointer-events-auto inline-flex items-center gap-3 rounded-panel border border-white/[0.08] bg-white/[0.10] px-4 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.08)] backdrop-blur-[32px] glass-transition"
     >
       {status === 'idle' ? (
         <button
           onClick={startRecording}
           disabled={!stream}
-          className="flex items-center gap-2 rounded-lg bg-red-500/80 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 rounded-lg bg-red-500/20 border border-red-500/30 px-3 py-1.5 text-sm font-medium text-white glass-transition-fast hover:bg-red-500/30 hover:scale-[1.02] active:scale-[0.98] active:bg-red-500/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
           <Circle className="h-3.5 w-3.5 fill-current" />
           Record
         </button>
       ) : (
         <>
-          <div className="flex items-center gap-2 text-sm text-overlay-text">
-            <span className="inline-block h-2.5 w-2.5 animate-pulse-dot rounded-full bg-red-500" />
-            <span className="font-mono text-xs text-overlay-text-muted">
+          <div className="flex items-center gap-2 text-sm text-white/90">
+            <span className="inline-block h-2.5 w-2.5 animate-pulse-dot rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+            <span className="font-mono text-xs text-white/60">
               {formatTime(elapsed)}
             </span>
           </div>
           <button
             onClick={stopRecording}
-            className="flex items-center gap-2 rounded-lg bg-overlay-accent-soft px-3 py-1.5 text-sm font-medium text-overlay-text transition-colors hover:bg-overlay-accent/40"
+            className="flex items-center gap-2 rounded-lg bg-white/[0.12] border border-white/[0.15] px-3 py-1.5 text-sm font-medium text-white glass-transition-fast hover:bg-white/[0.18] hover:scale-[1.02] active:scale-[0.98] active:bg-white/[0.22]"
           >
             <Square className="h-3 w-3 fill-current" />
             Stop
           </button>
         </>
       )}
-      <Video className="h-4 w-4 text-overlay-text-muted" />
+      <Video className="h-4 w-4 text-white/40" />
     </div>
   );
 }

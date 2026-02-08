@@ -23,7 +23,7 @@ export function SettingsPanel({
         <>
             {/* Overlay Backdrop */}
             <div
-                className={`fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 z-40 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                className={`fixed inset-0 bg-black/20 backdrop-blur-md glass-transition z-40 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
                     }`}
                 onClick={onClose}
             />
@@ -33,7 +33,10 @@ export function SettingsPanel({
                 className={`fixed bottom-6 left-6 w-[340px] h-[65vh] z-50 transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-[110%] opacity-0'
                     }`}
             >
-                <GlassPanel className="h-full w-full rounded-3xl border border-white/10 flex flex-col pointer-events-auto bg-black/60 shadow-2xl overflow-hidden">
+                <GlassPanel
+                    variant="elevated"
+                    className="h-full w-full rounded-3xl border-white/[0.12] flex flex-col pointer-events-auto bg-white/[0.08] backdrop-blur-[48px] shadow-[0_24px_64px_rgba(0,0,0,0.16)] overflow-hidden"
+                >
                     {/* Header */}
                     <div className="flex items-center justify-between p-5 border-b border-white/5">
                         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -61,9 +64,9 @@ export function SettingsPanel({
                                     <button
                                         key={m}
                                         onClick={() => setMode(m)}
-                                        className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${mode === m
-                                            ? 'bg-white/20 text-white shadow-sm'
-                                            : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                                        className={`flex-1 py-1.5 text-sm font-medium rounded-md glass-transition-fast ${mode === m
+                                            ? 'bg-white/20 text-white shadow-sm scale-[1.02]'
+                                            : 'text-white/40 hover:text-white/70 hover:bg-white/8'
                                             }`}
                                     >
                                         {m.charAt(0).toUpperCase() + m.slice(1)}
@@ -86,7 +89,7 @@ export function SettingsPanel({
                                 value={instructions}
                                 onChange={(e) => setInstructions(e.target.value)}
                                 placeholder="e.g. Tailor feedback for a Seed round pitch to YC partners..."
-                                className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all resize-none"
+                                className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/30 focus:bg-white/10 glass-transition resize-none"
                             />
                         </section>
                     </div>

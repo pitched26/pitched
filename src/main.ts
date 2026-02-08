@@ -90,6 +90,38 @@ ipcMain.handle(IPC_CHANNELS.GENERATE_SUMMARY, async (_event, req: GenerateSummar
   }
 });
 
+// Global references to prevent garbage collection
+let splashWindow: BrowserWindow | null = null;
+let overlayWindow: BrowserWindow | null = null;
+
+const createSplashWindow = () => {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workArea;
+
+  splashWindow = new BrowserWindow({
+    width: screenWidth,
+    height: screenHeight,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    center: true,
+    resizable: false,
+    skipTaskbar: true,
+    webPreferences: {
+      devTools: false,
+    },
+  });
+
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    splashWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/splash.html`);
+  } else {
+    // In production, splash.html should be in the same directory as index.html
+    splashWindow.loadFile(
+      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/splash.html`)
+    );
+  }
+};
+
 const createOverlayWindow = () => {
   const primaryDisplay = screen.getPrimaryDisplay();
   const {
@@ -99,14 +131,16 @@ const createOverlayWindow = () => {
     y: screenY,
   } = primaryDisplay.workArea;
 
-  const overlayWindow = new BrowserWindow({
+  overlayWindow = new BrowserWindow({
     width: screenWidth,
     height: screenHeight,
     x: screenX,
     y: screenY,
     transparent: true,
     frame: false,
-    alwaysOnTop: false, // Start as normal window, not always-on-top
+    // Start hidden, let splash screen handle the entrance
+    show: false,
+    alwaysOnTop: false,
     resizable: true,
     hasShadow: false,
     skipTaskbar: true,
@@ -120,6 +154,32 @@ const createOverlayWindow = () => {
   });
 
   overlayWindow.setBackgroundColor('#00000000');
+
+  // Transition Logic: Splash -> Main
+  overlayWindow.once('ready-to-show', () => {
+    // Ensure splash stays long enough to feel intentional (2s total minimum)
+    setTimeout(() => {
+      // Trigger fade-out animation before closing
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.webContents.executeJavaScript(
+          `document.body.classList.add('fade-out')`
+        );
+
+        // Wait for fade animation to complete (300ms) then close
+        setTimeout(() => {
+          if (splashWindow && !splashWindow.isDestroyed()) {
+            splashWindow.close();
+            splashWindow = null;
+          }
+          overlayWindow?.show();
+          overlayWindow?.focus();
+        }, 300);
+      } else {
+        overlayWindow?.show();
+        overlayWindow?.focus();
+      }
+    }, 2000);
+  });
 
   // ═══════════════════════════════════════════════════════════════════════
   // macOS-Native Focus Behavior
@@ -160,10 +220,15 @@ app.whenReady().then(() => {
     callback(false);
   });
 
+  // Launch splash immediately
+  createSplashWindow();
+
+  // Initialize main window in background
   createOverlayWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
+      createSplashWindow();
       createOverlayWindow();
     }
   });

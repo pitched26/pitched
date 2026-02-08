@@ -22,7 +22,10 @@ export function UnifiedTopBar({ data, isAnalyzing, pace = 0, tipHistory = [] }: 
         : "Start pitching for real-time feedback...";
 
     return (
-        <GlassPanel className="flex flex-col items-center w-full max-w-3xl px-10 py-6 mx-auto rounded-3xl pointer-events-auto backdrop-blur-3xl bg-black/40 border border-white/15 shadow-2xl transition-all duration-300 gap-3">
+        <GlassPanel
+            variant="elevated"
+            className="flex flex-col items-center w-full max-w-3xl px-10 py-6 mx-auto rounded-3xl pointer-events-auto backdrop-blur-[40px] bg-white/[0.08] border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.08)] glass-transition gap-3"
+        >
 
             {/* TOP ROW: Speed Indicator */}
             <div className="flex justify-center w-full opacity-90 scale-90">
@@ -68,8 +71,8 @@ export function UnifiedTopBar({ data, isAnalyzing, pace = 0, tipHistory = [] }: 
                             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/5 transition-all hover:bg-white/10"
                         >
                             <div className={`w-1.5 h-1.5 rounded-full ${s.value === 'High' ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.6)]' :
-                                    s.value === 'Medium' ? 'bg-amber-400' :
-                                        s.value === 'Low' ? 'bg-rose-400' : 'bg-white/20'
+                                s.value === 'Medium' ? 'bg-amber-400' :
+                                    s.value === 'Low' ? 'bg-rose-400' : 'bg-white/20'
                                 }`} />
                             <span className="text-[10px] uppercase font-medium text-white/70 tracking-wide">{s.label}</span>
                         </div>
