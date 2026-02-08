@@ -2,7 +2,7 @@
 
 # Pitchly
 
-### Your AI-Powered Pitch Coach — Right on Your Desktop
+### Your AI-Powered Pitch Coach, Right on Your Desktop.
 
 **Real-time vocal analysis · Live coaching feedback · Post-session summaries**
 
