@@ -1,6 +1,6 @@
 <div align="center">
 
-# Pitchly
+# Pitched
 
 ### Your AI-Powered Pitch Coach, Right on Your Desktop.
 
@@ -15,17 +15,17 @@
 
 ---
 
-<img width="720" alt="Pitchly overlays your camera feed with real-time coaching" src="ss.png">
+<img width="720" alt="Pitched overlays your camera feed with real-time coaching" src="ss.png">
 
 </div>
 
 ---
 
-## What is Pitchly?
+## What is Pitched?
 
-Pitchly is a **transparent desktop overlay** that sits on top of your camera feed and gives you **real-time, AI-powered coaching** while you practice your pitch. Think of it as a teleprompter meets speech coach — it listens to your voice, analyzes your delivery, and surfaces actionable feedback *as you speak*.
+Pitched is a **transparent desktop overlay** that sits on top of your camera feed and gives you **real-time, AI-powered coaching** while you practice your pitch. Think of it as a teleprompter meets speech coach — it listens to your voice, analyzes your delivery, and surfaces actionable feedback *as you speak*.
 
-> **No more guessing if you sound confident.** Pitchly tells you — in real time.
+> **No more guessing if you sound confident.** Pitched tells you — in real time.
 
 ---
 
@@ -39,7 +39,7 @@ Microphone → PCM Audio Capture → OpenAI Realtime API → AI Coach → Live F
 2. **Streaming Analysis** — Sends audio chunks every 2 seconds to OpenAI's Realtime API over WebSocket
 3. **Vocal Intelligence** — The AI analyzes *what* you say and *how* you say it (confidence, pace, clarity, energy, filler words)
 4. **Live Coaching** — Hyper-specific tips appear on-screen referencing your actual words and vocal patterns
-5. **Post-Session Summary** — When you stop, Pitchly generates a full debrief with strengths, areas to improve, and an AI-written summary
+5. **Post-Session Summary** — When you stop, Pitched generates a full debrief with strengths, areas to improve, and an AI-written summary
 
 ---
 
@@ -62,7 +62,7 @@ Microphone → PCM Audio Capture → OpenAI Realtime API → AI Coach → Live F
 ## Architecture
 
 ```
-pitchly/
+pitched/
 ├── src/
 │   ├── main.ts                 # Electron main process — IPC handlers, window creation
 │   ├── preload.js              # Secure bridge between main & renderer
@@ -109,8 +109,8 @@ pitchly/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/pitchly.git
-cd pitchly
+git clone https://github.com/your-username/pitched.git
+cd pitched
 
 # Install dependencies
 npm install
@@ -146,7 +146,7 @@ Produces platform-specific distributables (`.dmg` on macOS, `.exe` on Windows, `
 
 ## Usage
 
-1. **Launch Pitchly** — the app opens as a full-screen transparent overlay with your camera feed
+1. **Launch Pitched** — the app opens as a full-screen transparent overlay with your camera feed
 2. **Hit Record** — click the center record button to start your pitch session
 3. **Pitch naturally** — coaching tips, signal ratings, and pace tracking appear in real time
 4. **Use the Teleprompter** *(optional)* — click the document icon to open a floating script viewer
