@@ -1,4 +1,3 @@
-import React from 'react';
 import { GlassPanel } from './GlassPanel';
 import type { PitchData, CoachingTip } from '../data/mockPitch';
 

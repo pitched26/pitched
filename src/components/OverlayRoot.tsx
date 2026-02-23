@@ -14,6 +14,7 @@ export function OverlayRoot() {
     pitchData,
     isAnalyzing,
     pace,
+    tempoMs,
     transcript,
     tipHistory,
     startAnalysis,
@@ -155,6 +156,7 @@ export function OverlayRoot() {
             data={filteredDisplayData}
             isAnalyzing={isAnalyzing}
             pace={pace}
+            tempoMs={tempoMs}
             tipHistory={tipHistory}
           />
         </div>

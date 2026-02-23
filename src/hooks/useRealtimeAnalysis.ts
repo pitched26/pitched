@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { PitchData, CoachingTip } from '../types/pitch';
 import { PaceTracker } from '../utils/paceTracker';
+import { WordBoundaryDetector } from '../utils/wordBoundaryDetector';
 
 interface AnalysisState {
   pitchData: PitchData | null;
@@ -9,6 +10,7 @@ interface AnalysisState {
   error: string | null;
   tipHistory: CoachingTip[];
   pace: number; // -1 (slow) to 1 (fast), 0 = ideal
+  tempoMs: number | null;
   transcript: string;
 }
 
@@ -20,18 +22,13 @@ interface RealtimeAnalysisResult extends AnalysisState {
 // ... imports and constants ...
 
 const CYCLE_MS = 2_000;
-const PACE_UPDATE_MS = 100;
+const PACE_UPDATE_MS = 120;
 const MAX_INFLIGHT = 3;
 const MIN_AUDIO_SAMPLES = 2400; // ~100ms at 24kHz
 
 const TAG = '[Pipeline]';
 function ts(): string {
   return new Date().toISOString();
-}
-
-function countWords(text: string): number {
-  if (!text) return 0;
-  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -120,12 +117,13 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
     error: null,
     tipHistory: [],
     pace: 0,
+    tempoMs: null,
     transcript: "",
   });
 
   // Pace tracking (algorithmic, no LLM)
   const paceTrackerRef = useRef(new PaceTracker());
-  const prevWordCountRef = useRef(0);
+  const wordDetectorRef = useRef<WordBoundaryDetector | null>(null);
   const paceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Audio capture refs
@@ -205,16 +203,6 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
         // Only display if this is newer than the last displayed result
         if (seq <= lastDisplayedSeqRef.current) return;
 
-        // Feed new words to PaceTracker
-        if (result.transcript) {
-          const totalWords = countWords(result.transcript);
-          const newWords = totalWords - prevWordCountRef.current;
-          if (newWords > 0) {
-            paceTrackerRef.current.addWords(newWords, performance.now());
-            prevWordCountRef.current = totalWords;
-          }
-        }
-
         if (result.data) {
           lastDisplayedSeqRef.current = seq;
 
@@ -257,8 +245,8 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       seqRef.current = 0;
       lastDisplayedSeqRef.current = 0;
       inflightRef.current = 0;
-      prevWordCountRef.current = 0;
       paceTrackerRef.current.reset();
+      wordDetectorRef.current?.reset();
       recentTipTexts = []; // Reset anti-repetition window
 
       setState({
@@ -268,6 +256,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
         error: null,
         tipHistory: [],
         pace: 0,
+        tempoMs: null,
         transcript: "",
       });
 
@@ -280,12 +269,22 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       // Capture PCM at 24kHz (what OpenAI Realtime API expects)
       const audioContext = new AudioContext({ sampleRate: 24000 });
       const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      const processor = audioContext.createScriptProcessor(1024, 1, 1);
+      wordDetectorRef.current = new WordBoundaryDetector(audioContext.sampleRate);
 
       processor.onaudioprocess = (e: AudioProcessingEvent) => {
         if (!activeRef.current) return;
         const inputData = e.inputBuffer.getChannelData(0);
         pcmChunksRef.current.push(new Float32Array(inputData));
+
+        const detector = wordDetectorRef.current;
+        if (detector) {
+          const nowMs = audioContext.currentTime * 1000;
+          const wordTimestamp = detector.processFrame(inputData, nowMs);
+          if (wordTimestamp !== null) {
+            paceTrackerRef.current.addWord(wordTimestamp);
+          }
+        }
       };
 
       source.connect(processor);
@@ -306,11 +305,16 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       // Pace update loop (200ms) — runs independently of LLM responses
       paceIntervalRef.current = setInterval(() => {
         if (!activeRef.current) return;
-        const raw = paceTrackerRef.current.update(performance.now());
+        // Keep pace math on the same clock as detected word timestamps.
+        const nowMs = audioContextRef.current
+          ? audioContextRef.current.currentTime * 1000
+          : performance.now();
+        const raw = paceTrackerRef.current.update(nowMs);
+        const tempoMs = paceTrackerRef.current.getCurrentIntervalMs();
         const rounded = Math.round(raw * 100) / 100;
         setState((prev) => {
-          if (prev.pace === rounded) return prev; // skip no-op render
-          return { ...prev, pace: rounded };
+          if (prev.pace === rounded && prev.tempoMs === tempoMs) return prev; // skip no-op render
+          return { ...prev, pace: rounded, tempoMs };
         });
       }, PACE_UPDATE_MS);
     },
@@ -336,6 +340,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
     processorRef.current = null;
     sourceRef.current = null;
     audioContextRef.current = null;
+    wordDetectorRef.current = null;
     pcmChunksRef.current = [];
 
     window.pitchly.disconnectRealtime();
@@ -349,6 +354,7 @@ export function useRealtimeAnalysis(): RealtimeAnalysisResult {
       processorRef.current?.disconnect();
       sourceRef.current?.disconnect();
       audioContextRef.current?.close();
+      wordDetectorRef.current = null;
     };
   }, []);
 

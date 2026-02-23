@@ -1,5 +1,4 @@
-import React from 'react';
-import { Settings, X, ChevronRight } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 
 interface SettingsPanelProps {

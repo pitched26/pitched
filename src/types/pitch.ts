@@ -34,6 +34,7 @@ export const IPC_CHANNELS = {
 // Single IPC response: transcription + analysis in one shot
 export interface AnalyzeAudioResponse {
   transcript?: string;
+  transcriptDelta?: string;
   data?: PitchData;
   error?: string;
 }

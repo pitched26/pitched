@@ -1,5 +1,3 @@
-import React from 'react';
-
 type Level = 'High' | 'Medium' | 'Low' | 'Unclear';
 
 const levelStyles: Record<Level, string> = {

@@ -108,7 +108,7 @@ function buildCoachingTool(mode: string) {
 
 // Pending analysis request waiting for the model's response
 interface PendingRequest {
-  resolve: (value: { transcript: string; data: PitchData }) => void;
+  resolve: (value: { transcript: string; transcriptDelta: string; data: PitchData }) => void;
   reject: (reason: Error) => void;
   startTime: number;
 }
@@ -225,7 +225,7 @@ export class RealtimeService {
    */
   async analyzeAudio(
     pcm16Base64: string
-  ): Promise<{ transcript: string; data: PitchData }> {
+  ): Promise<{ transcript: string; transcriptDelta: string; data: PitchData }> {
     const callId = ++this.callCount;
     console.log(`[${ts()}] ${TAG} call #${callId} — ${pcm16Base64.length} base64 chars`);
 
@@ -322,6 +322,7 @@ export class RealtimeService {
 
           this.pending.resolve({
             transcript: this.transcript,
+            transcriptDelta: this.pendingTranscript,
             data: parsed,
           });
         } catch (err) {

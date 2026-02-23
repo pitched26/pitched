@@ -46,8 +46,15 @@ ipcMain.handle(
       const start = performance.now();
       const result = await realtimeService.analyzeAudio(audioBase64);
       const elapsed = (performance.now() - start).toFixed(0);
-      console.log(`[${now()}] [IPC] analyze-audio #${callId} RESPONDED in ${elapsed}ms — transcript=${result.transcript.length} chars, tips=${result.data.tips.length}`);
-      return { transcript: result.transcript, data: result.data };
+      console.log(
+        `[${now()}] [IPC] analyze-audio #${callId} RESPONDED in ${elapsed}ms — ` +
+        `transcript=${result.transcript.length} chars, delta=${result.transcriptDelta.length} chars, tips=${result.data.tips.length}`
+      );
+      return {
+        transcript: result.transcript,
+        transcriptDelta: result.transcriptDelta,
+        data: result.data,
+      };
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Analysis failed';

@@ -1,7 +1,5 @@
-import React from 'react';
 import { GlassPanel } from './GlassPanel';
 import { SpeedIndicator } from './SpeedIndicator';
-import { SignalBadge } from './SignalBadge';
 import type { PitchData } from '../data/mockPitch';
 import type { CoachingTip } from '../types/pitch';
 
@@ -11,10 +9,11 @@ interface UnifiedTopBarProps {
     data: PitchData;
     isAnalyzing: boolean;
     pace?: number;
+    tempoMs?: number | null;
     tipHistory?: CoachingTip[];
 }
 
-export function UnifiedTopBar({ data, isAnalyzing, pace = 0, tipHistory = [] }: UnifiedTopBarProps) {
+export function UnifiedTopBar({ data, isAnalyzing, pace = 0, tempoMs = null, tipHistory = [] }: UnifiedTopBarProps) {
     const visibleTips = tipHistory.slice(-MAX_VISIBLE_TIPS);
 
     const placeholder = isAnalyzing
@@ -29,7 +28,7 @@ export function UnifiedTopBar({ data, isAnalyzing, pace = 0, tipHistory = [] }: 
 
             {/* TOP ROW: Speed Indicator */}
             <div className="flex justify-center w-full opacity-90 scale-90">
-                <SpeedIndicator pace={pace} isSpeaking={isAnalyzing} />
+                <SpeedIndicator pace={pace} tempoMs={tempoMs} isSpeaking={isAnalyzing} />
             </div>
 
             {/* MIDDLE ROW: Rolling Feedback List */}

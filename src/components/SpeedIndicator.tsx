@@ -1,10 +1,25 @@
 interface SpeedIndicatorProps {
     pace: number;       // -1 (slow) to 1 (fast), 0 = ideal
+    tempoMs?: number | null;
     isSpeaking: boolean;
 }
 
-export function SpeedIndicator({ pace, isSpeaking }: SpeedIndicatorProps) {
+const FAST_DELTA_MS = 240;
+const IDEAL_DELTA_MS = 340;
+const SLOW_DELTA_MS = 760;
+
+export function SpeedIndicator({ pace, tempoMs = null, isSpeaking }: SpeedIndicatorProps) {
     const pct = (pace + 1) / 2 * 100;
+    const tempoLabel = tempoMs === null ? '--' : `${tempoMs}ms`;
+
+    let paceLabel = 'Waiting';
+    if (tempoMs !== null) {
+        paceLabel = tempoMs < FAST_DELTA_MS
+            ? 'Fast'
+            : tempoMs > SLOW_DELTA_MS
+                ? 'Slow'
+                : 'Ideal';
+    }
 
     return (
         <div className="flex flex-col items-center gap-1.5 w-full max-w-[200px]">
@@ -30,7 +45,7 @@ export function SpeedIndicator({ pace, isSpeaking }: SpeedIndicatorProps) {
                     className="absolute inset-0 will-change-transform"
                     style={{
                         transform: `translateX(${pct}%)`,
-                        transition: 'transform 350ms cubic-bezier(0.25, 0.1, 0.25, 1)',
+                        transition: 'transform 180ms cubic-bezier(0.2, 0, 0.2, 1)',
                     }}
                 >
                     <div
@@ -41,6 +56,14 @@ export function SpeedIndicator({ pace, isSpeaking }: SpeedIndicatorProps) {
                         }}
                     />
                 </div>
+            </div>
+
+            <div className="w-full flex items-center justify-between text-[10px] text-overlay-text-muted font-medium tracking-wide">
+                <span className="font-mono text-white/85">IWI {tempoLabel}</span>
+                <span className="uppercase opacity-80">{paceLabel}</span>
+            </div>
+            <div className="w-full text-[9px] text-center text-overlay-text-muted/80 tracking-wide">
+                fast &lt; {FAST_DELTA_MS}ms · ideal ~ {IDEAL_DELTA_MS}ms · slow &gt; {SLOW_DELTA_MS}ms
             </div>
         </div>
     );

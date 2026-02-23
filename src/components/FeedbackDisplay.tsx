@@ -1,7 +1,5 @@
-import React from 'react';
 import { GlassPanel } from './GlassPanel';
 import { SpeedIndicator } from './SpeedIndicator';
-import { SignalBadge } from './SignalBadge';
 import type { PitchData } from '../data/mockPitch';
 
 interface FeedbackDisplayProps {
